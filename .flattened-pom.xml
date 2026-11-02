@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.raelity.lib</groupId>
+  <artifactId>raelity-lib</artifactId>
+  <version>2.0.0</version>
+  <name>raelity-lib</name>
+  <description>Multi-Screen handling, MRU&lt;T>, ValueMap&lt;K,V>, ...</description>
+  <url>https://github.com/errael/raelity-lib</url>
+  <organization>
+    <name>Raelity Engineering</name>
+    <url>http://raelity.com</url>
+  </organization>
+  <licenses>
+    <license>
+      <name>MPL-2.0</name>
+      <url>https://mozilla.org</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <name>Ernie Rael</name>
+      <email>errael@raelity.com</email>
+      <organization>Raelity Engineering</organization>
+      <organizationUrl>http://raelity.com</organizationUrl>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:https://github.com/errael/raelity-lib.git</connection>
+    <developerConnection>scm:git:git@github.com:errael/raelity-lib.git</developerConnection>
+    <url>https://github.com/errael/raelity-lib</url>
+  </scm>
+  <issueManagement>
+    <system>GitHub</system>
+    <url>https://github.com/errael/raelity-lib/issues</url>
+  </issueManagement>
+  <distributionManagement>
+    <repository>
+      <id>sonatype-central-portal</id>
+      <name>My Project Releases</name>
+      <url>https://repo.maven.apache.org/maven2</url>
+    </repository>
+    <snapshotRepository>
+      <id>sonatype-central-portal</id>
+      <name>My Project Snapshots</name>
+      <url>https://central.sonatype.com/repository/maven-snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
+</project>

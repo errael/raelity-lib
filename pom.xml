@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.raelity.lib</groupId>
+  <artifactId>raelity-lib</artifactId>
+  <version>2.0.0</version>
+  <packaging>jar</packaging>
+
+  <name>${project.artifactId}</name>
+
+  <description>
+        <![CDATA[Multi-Screen handling, MRU<T>, ValueMap<K,V>, ...]]>
+  </description>
+
+  <url>https://github.com/errael/raelity-lib</url>
+
+  <organization>
+    <name>Raelity Engineering</name>
+    <url>http://raelity.com</url>
+  </organization>
+
+  <licenses>
+    <license>
+      <name>MPL-2.0</name>
+      <url>https://mozilla.org</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>Ernie Rael</name>
+      <email>errael@raelity.com</email>
+      <organization>Raelity Engineering</organization>
+      <organizationUrl>http://raelity.com</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <url>https://github.com/errael/raelity-lib</url>
+    <connection>scm:git:https://github.com/errael/raelity-lib.git</connection>
+    <developerConnection>
+      scm:git:git@github.com:errael/raelity-lib.git
+    </developerConnection>
+  </scm>
+
+  <issueManagement>
+    <system>GitHub</system>
+    <url>https://github.com/errael/raelity-lib/issues</url>
+  </issueManagement>
+
+  <!-- the following is not easy to take out of here into a common area
+       AI says the following is key:
+          mvn njord:status -DaltDeploymentRepository
+              =sonatype-central-portal::default::https://localhost
+  -->
+  <distributionManagement>
+    <snapshotRepository>
+      <id>sonatype-central-portal</id>
+      <name>My Project Snapshots</name>
+      <url>https://central.sonatype.com/repository/maven-snapshots</url>
+    </snapshotRepository>
+    <repository>
+      <id>sonatype-central-portal</id>
+      <name>My Project Releases</name>
+      <url>https://repo.maven.apache.org/maven2</url>
+    </repository>
+  </distributionManagement>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>17</maven.compiler.release>
+    <junit-jupiter.version>6.1.3</junit-jupiter.version>
+
+    <!-- Publish Plugins -->
+    <maven-deploy-plugin.version>3.2.0</maven-deploy-plugin.version>
+    <njord.version>0.9.10</njord.version>
+    <njord.publisher>sonatype-central-portal</njord.publisher>
+    <njord.releaseUrl>njord:template:release-sca</njord.releaseUrl>
+
+    <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+    <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
+    <flatten-maven-plugin.version>1.8.0</flatten-maven-plugin.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Tests -->
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${junit-jupiter.version}</version>
+        <scope>test</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <extensions>
+      <extension>
+        <groupId>eu.maveniverse.maven.njord</groupId>
+        <artifactId>extension3</artifactId>
+        <version>${njord.version}</version>
+      </extension>
+    </extensions>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>eu.maveniverse.maven.plugins</groupId>
+          <artifactId>njord</artifactId>
+          <version>${njord.version}</version>
+        </plugin>
+
+        <!-- Standard Deploy: Declared here so it's easy to configure everywhere -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>${maven-deploy-plugin.version}</version>
+        </plugin>
+
+        <!-- Required by Central: Source JAR generation -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>${maven-source-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <goals>
+                <goal>jar-no-fork</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+
+        <!-- Required by Central: Javadoc JAR generation -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>${maven-javadoc-plugin.version}</version>
+          <configuration>
+            <doclint>none</doclint>
+            <failOnError>false</failOnError>
+            <quiet>true</quiet>
+          </configuration>
+          <executions>
+            <execution>
+              <id>attach-javadocs</id>
+              <phase>package</phase>
+              <goals>
+                <goal>jar</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+
+        <!-- Required by Central: GPG Cryptographic Signing -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <version>${maven-gpg-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>sign-artifacts</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>sign</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+
+        <!-- Resolves parent properties/variables before uploading -->
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>flatten-maven-plugin</artifactId>
+          <version>${flatten-maven-plugin.version}</version>
+          <configuration>
+            <flattenMode>oss</flattenMode>
+            <updatePomFile>true</updatePomFile> <!-- for local install -->
+            <pomElements>
+              <name>expand</name>
+            </pomElements>
+          </configuration>
+          <executions>
+            <execution>
+              <id>flatten</id>
+              <phase>process-resources</phase>
+              <goals>
+                <goal>flatten</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>flatten.clean</id>
+              <phase>clean</phase>
+              <goals>
+                <goal>clean</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-deploy-plugin</artifactId>
+          </plugin>
+          <plugin>
+            <groupId>eu.maveniverse.maven.plugins</groupId>
+            <artifactId>njord</artifactId>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>flatten-maven-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+</project>
+<!-- vi: set sw=2 ts=8: -->
