@@ -3,6 +3,8 @@
 \.log$
 
 syntax: glob
+.flattened-pom.xml
+
 *~
 *.sw[pmno]
 *.orig

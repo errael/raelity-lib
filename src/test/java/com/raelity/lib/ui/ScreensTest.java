@@ -16,12 +16,19 @@ import java.awt.GraphicsDevice;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import com.raelity.lib.ui.ScreenOrder.ScreenItem;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -32,25 +39,30 @@ import static org.junit.jupiter.api.Assertions.*;
 public class ScreensTest
 {
 
+    /** x */
 public ScreensTest()
 {
 }
 
+/** x */
 @BeforeAll
 public static void setUpClass()
 {
 }
 
+/** x */
 @AfterAll
 public static void tearDownClass()
 {
 }
 
+/** x */
 @BeforeEach
 public void setUp()
 {
 }
 
+/** x */
 @AfterEach
 public void tearDown()
 {
@@ -90,6 +102,64 @@ public void testSetPrefGraphicsDev_String()
     // doing prev with "100" should not have changed anything
     GraphicsDevice pref = Screens.getPrefGraphicsDev();
     assertEquals(current, pref);
+}
+
+static int K1 = 1000;
+static int K2 = 2000;
+/**
+ * Each box is approx 2K wide, 1K high.
+ * The params are the x,y postion and are multiplied by 1K.
+ * The width/hieght are tweaked 
+ * @param x
+ * @param y
+ * @return 
+ */
+ScreenItem r(int index, double x, double y) {
+    ScreenItem item = new ScreenItem(index, new Rectangle((int)(x*K2), (int)(y*K1), K2, K1));
+    return item;
+}
+
+// This is the expected result ordering.
+private final List<ScreenItem> initialScreenItems
+    = Collections.unmodifiableList(new ArrayList<>(List.of(
+        r(0, 0, 0), r(1, 2, 0),  r(2, 4, 0),  r(3, 6, 0),
+        r(4, 0, 1), r(5, 2, 1),  r(6, 4, 1),  r(7, 6, 1),
+        r(8, 0, 2), r(9, 2, 2), r(10, 4, 2), r(11, 6, 2)
+)));
+// When the screens are sorted expect 0 - 11 from initialScreenItems
+private final List<Integer> expectedOrder = IntStream.range(0, 12).boxed().toList();
+
+private final Random random = new Random(37);
+/** return randomized list of ScreenItem. */
+@SuppressWarnings("UseOfSystemOutOrSystemErr")
+List<ScreenItem> randomItems() {
+    List<ScreenItem> items = new ArrayList<>(initialScreenItems);
+    Collections.shuffle(items, random);
+    List<Integer> order = items.stream().map((item) -> item.getIndex()).toList();
+    System.out.printf("Random_order: %s\n", order);
+    return items;
+}
+
+/**
+ * Test screen bounding sort.
+ */
+@Test
+@SuppressWarnings("UseOfSystemOutOrSystemErr")
+public void testScreenOrderGetScreenSort()
+{
+    System.out.println("ScreenOrder.getScreenSort");
+
+    List<ScreenItem> randomItems = randomItems();
+    // Same order as randomItems, arg for getScreenSort.
+    List<Rectangle> randomRects = randomItems.stream().map((item) -> item.getBounds()).toList();
+
+    List<ScreenItem> sorted = ScreenOrder.screenSort(randomRects);
+    // The index of a sorted ScreenItem works with either radomItems or randomRects
+    List<Integer> result = sorted.stream()
+        .map(sortedItem -> randomItems.get(sortedItem.getIndex()))
+        .map(randomItem -> randomItem.getIndex())
+        .toList();
+    assertEquals(expectedOrder, result);
 }
 
 ////////////////////////////////////////////////////////////////////////////

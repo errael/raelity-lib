@@ -14,28 +14,36 @@ package com.raelity.lib.collect;
 import org.junit.jupiter.api.Nested;
 
 /**
- *
- * @author err
+ * Tests for MRU of both list and set.
  */
 public class MRU_Group_Test
 {
+  
+  /** x */
+  @Nested
+  public class MRU_List_Test extends MRUTest
+  {
+    /** x */
+    public MRU_List_Test() { }
 
-    @Nested
-    public class MRU_List_Test extends MRUTest
-    {
-    public MRU_List_Test()
-    {
-        super("list");
+    @Override
+    MRU<String> setupTestMRU() {
+      return MRU.getListMRU(limit);
     }
-    }
+  }
+  
+  /** x */
+  @Nested
+  public class MRU_Set_Test extends MRUTest
+  {
+    /** x */
+    public MRU_Set_Test() { }
 
-    @Nested
-    public class MRU_Set_Test extends MRUTest
-    {
-    public MRU_Set_Test()
-    {
-        super("set");
+    @Override
+    MRU<String> setupTestMRU() {
+      return MRU.getSetMRU(limit);
     }
-    }
-    
+  }
+  
 }
+// vi: set sw=2 ts=8:

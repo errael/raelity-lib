@@ -20,54 +20,48 @@ import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- *
- * @author err
+ * This is used by MRU_Group_Test
  */
-@Disabled("")
-public class MRUTest
+public abstract class MRUTest
 {
 
 MRU<String> mru;
 private static final int DEFAULT_LIMIT = 5;
 int limit = DEFAULT_LIMIT;
-String testType;
 
-public MRUTest(String testType)
+/** x */
+@SuppressWarnings("OverridableMethodCallInConstructor")
+public MRUTest()
 {
-    this.testType = testType;
-    setupTestMRU();
+    mru = setupTestMRU();
 }
 
 /** Called at start of each test method with it's parameter.
  * In junit4, this was a constructor, but parameterized tests
  * can not be on the class level.
  */
-private void setupTestMRU()
-{
-    mru = switch(testType) {
-    case "list" -> MRU.getListMRU(limit);
-    case "set" -> MRU.getSetMRU(limit);
-    //case default, null -> throw new RuntimeException("WHAT?");
-    default -> throw new RuntimeException("WHAT?");
-    };
-}
+abstract MRU<String> setupTestMRU();
 
+/** x */
 @BeforeAll
 public static void setUpClass()
 {
 }
 
+/** x */
 @AfterAll
 public static void tearDownClass()
 {
 }
 
+/** x */
 @BeforeEach
 public void setUp()
 {
     initMRU();
 }
 
+/** x */
 @AfterEach
 public void tearDown()
 {
@@ -101,7 +95,7 @@ List<String> lrev = new ArrayList<>();
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
 void reportTest(String test)
 {
-    System.out.println(testType  + ": " + test);
+    System.out.println(mru.getClass().getSimpleName()  + ": " + test);
 }
 
 /**
@@ -144,7 +138,6 @@ public void testAddItem()
 
 /**
  * Test of removeItem method, of class MRU.
- * @param which
  */
 @Test
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
@@ -173,7 +166,6 @@ public void testRemoveItem()
 
 /**
  * Actually test setCapacity
- * @param which
  */
 @Test
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
@@ -228,7 +220,6 @@ public void testSetMaxSize()
 }
 /**
  * Test of peekMRU method, of class MRU.
- * @param which
  */
 @Test
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
@@ -254,7 +245,6 @@ public void testPeekMRU()
 
 /**
  * Test of exceptions , of class MRU.
- * @param which
  */
 @Test
 @SuppressWarnings({"UseOfSystemOutOrSystemErr", "ThrowableResultIgnored"})

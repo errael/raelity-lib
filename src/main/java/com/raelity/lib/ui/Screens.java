@@ -31,9 +31,8 @@ import java.awt.Window;
  * See {@link #setPrefGraphicsDev(java.lang.String) }
  * or {@link #setPrefGraphicsDev(int) } to set the preferred graphics device
  * used by these methods.
- *
- * @author err
  */
+// TODO: should examine/validate for multithreading
 public class Screens {
   private Screens() {
   }
@@ -159,19 +158,20 @@ public class Screens {
 
   /**
    * This sets the preferred graphics device, use by the methods in this class,
-   * according the value of the specified environment variable. If null is
-   * returned, then the existing preferred device is not changed.
+   * according the value of the specified String. First check System properties,
+   * if not found then check environment variables.
+   * If neither is found then the existing preferred device is not changed.
    *
-   * @param envPropVar check this environment variable's value
+   * @param vari check this property/environment variable's value
    * @return updated preferred graphics dev or null if bad argument
    */
-  public static GraphicsDevice setPrefGraphicsDev(String envPropVar) {
+  public static GraphicsDevice setPrefGraphicsDev(String vari) {
     GraphicsDevice gdev = null;
     int screenIdx;
-    String sint = System.getenv(envPropVar);
-    if(sint == null) {
-      sint = System.getProperty(envPropVar);
-    }
+    String sint;
+    sint = System.getProperty(vari);
+    if(sint == null)
+      sint = System.getenv(vari);
     if(sint != null) {
       try {
         screenIdx = Integer.parseInt(sint);
@@ -191,11 +191,7 @@ public class Screens {
    * @return updated preferred graphics dev or null if bad argument
    */
   public static GraphicsDevice setPrefGraphicsDev(int screenIdx) {
-    GraphicsDevice gdev = null;
-    GraphicsDevice[] devs = GraphicsEnvironment
-        .getLocalGraphicsEnvironment().getScreenDevices();
-    if(screenIdx >= 0 && screenIdx < devs.length)
-      gdev = devs[screenIdx];
+    GraphicsDevice gdev = ScreenOrder.getGraphicsDevice(screenIdx);
     if(gdev != null)
       preferredGraphicsDevice = gdev;
     return gdev;
@@ -203,14 +199,13 @@ public class Screens {
 
   /**
    * Check each screen Device finding the defaultConfiguration that contains the
-   * given point.
+   * given point. Return defaultScreenDevice if not found.
    *
    * @param location
    * @return
    */
   public static GraphicsConfiguration getGraphicsConfiguration(Point location) {
-    GraphicsDevice[] gs = GraphicsEnvironment.getLocalGraphicsEnvironment()
-        .getScreenDevices();
+    GraphicsDevice[] gs = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
     for(GraphicsDevice gd : gs) {
       GraphicsConfiguration config = gd.getDefaultConfiguration();
       if(config.getBounds().contains(location))
@@ -220,9 +215,11 @@ public class Screens {
         .getDefaultScreenDevice().getDefaultConfiguration();
   }
 
-  private static void initVirtualParams() {
+  /** This is only invoked from ScreenOrder (or class initialization) */
+  static void initVirtualParams() {
     Point zeroPoint = new Point();
     virtualBounds = new Rectangle();
+    isVirtual = false;
     GraphicsEnvironment ge = GraphicsEnvironment.
         getLocalGraphicsEnvironment();
     GraphicsDevice[] gs = ge.getScreenDevices();
@@ -234,42 +231,5 @@ public class Screens {
       }
     }
   }
-  /* ************************************
-  
-  public static GraphicsDevice getGraphicsDev()
-  {
-  //checkGaphicsDev();
-  GraphicsDevice dev = null;
-  GraphicsDevice[] devs
-  = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
-  dev = devs[1];
-  GraphicsConfiguration[] gc = dev.getConfigurations();
-  GraphicsConfiguration gcDef
-  = dev.getDefaultConfiguration();
-  return dev != null ? dev
-  : GraphicsEnvironment.getLocalGraphicsEnvironment()
-  .getDefaultScreenDevice();
-  }
-  
-  public static Rectangle checkGaphicsDev()
-  {
-  Rectangle virtualBounds = new Rectangle();
-  GraphicsEnvironment ge = GraphicsEnvironment.
-  getLocalGraphicsEnvironment();
-  GraphicsDevice[] gs =
-  ge.getScreenDevices();
-  for (int j = 0; j < gs.length; j++) {
-  GraphicsDevice gd = gs[j];
-  GraphicsConfiguration[] gc =
-  gd.getConfigurations();
-  for (int i=0; i < gc.length; i++) {
-  Rectangle bounds = gc[i].getBounds();
-  virtualBounds =
-  virtualBounds.union(gc[i].getBounds());
-  }
-  }
-  return virtualBounds;
-  }
-  ****************************************/
 }
 // vi: set sw=2 ts=8:
