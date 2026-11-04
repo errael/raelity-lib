@@ -11,6 +11,7 @@
 
 package com.raelity.lib.ui;
 
+import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.Rectangle;
 import java.util.ArrayList;
@@ -29,11 +30,13 @@ final class ScreenOrder {
   private ScreenOrder() {
   }
 
+  /** Only written to by sort method */
   static final class ScreenItem {
-    private final int index;
+    private final int index; // 0 to nScreen-1; an index into the original list
     private final Rectangle bounds;
+    private int rowIndex; // 0 to nRows-1; result of the sort.
 
-    public ScreenItem(int index, Rectangle bounds) {
+    ScreenItem(int index, Rectangle bounds) {
       this.index = index;
       this.bounds = new Rectangle(bounds);
     }
@@ -41,6 +44,11 @@ final class ScreenOrder {
     /** Index into the platform-ordered array/list this item came from. */
     public int getIndex() {
       return index;
+    }
+
+    /** Sorted row index */
+    public int getRowIndex() {
+      return rowIndex;
     }
 
     /** Defensive copy; the sort uses the accessors below instead. */
@@ -72,7 +80,7 @@ final class ScreenOrder {
       = Comparator.comparingDouble(ScreenItem::getCenterX);
 
   /** Testable core: takes the screen bounds in platform order. */
-  public static List<ScreenItem> screenSort(List<Rectangle> screenBounds) {
+  static List<ScreenItem> screenSort(List<Rectangle> screenBounds) {
     List<ScreenItem> items = new ArrayList<>(screenBounds.size());
     for(int i = 0; i < screenBounds.size(); i++)
       items.add(new ScreenItem(i, screenBounds.get(i)));
@@ -80,19 +88,36 @@ final class ScreenOrder {
     List<ScreenItem> result = new ArrayList<>(items.size());
     List<ScreenItem> row = new ArrayList<>();
     double rowBottom = 0;
+    int rowIndex = 0;
     for(ScreenItem it : items) {
       if(!row.isEmpty() && it.getCenterY() >= rowBottom) {
         row.sort(BY_X);
         result.addAll(row);
         row.clear();
+        rowIndex++;
       }
       if(row.isEmpty())
         rowBottom = it.getMaxY();
+      it.rowIndex = rowIndex;
       row.add(it);
     }
     row.sort(BY_X);
     result.addAll(row);
     return result;
+  }
+
+  /** Return rows of indexes into system's dev array, intermediate step here for testing */
+  static List<List<Integer>> screenLayoutIndex(List<ScreenItem> screenItemSort) {
+    int rowIndex = -1;
+    List<List<Integer>> screenLayoutIndex = new ArrayList<>(5);
+    for(ScreenItem screenItem : screenItemSort) {
+      if (rowIndex != screenItem.getRowIndex()) {
+        rowIndex = screenItem.getRowIndex();
+        screenLayoutIndex.add(new ArrayList<>());
+      }
+      screenLayoutIndex.get(screenLayoutIndex.size()-1).add(screenItem.getIndex());
+    }
+    return screenLayoutIndex;
   }
 
   /**
@@ -109,11 +134,15 @@ final class ScreenOrder {
    * array from the same getScreenDevices() call, so fetch the devices and
    * the sort together if you need to map back to a GraphicsDevice.
    */
-  public static List<GraphicsDevice> getScreenSort() {
+  public static List<GraphicsConfiguration> getScreenSort() {
     return changeDetector.getScreenSort();
   }
 
-  public static List<Rectangle> boundsOf(GraphicsDevice[] devices) {
+  public static List<List<GraphicsConfiguration>> getScreenLayout() {
+    return changeDetector.getScreenLayout();
+  }
+
+  public static List<Rectangle> screenBoundsOf(GraphicsDevice[] devices) {
     List<Rectangle> bounds = new ArrayList<>(devices.length);
     for(GraphicsDevice d : devices)
       bounds.add(d.getDefaultConfiguration().getBounds());

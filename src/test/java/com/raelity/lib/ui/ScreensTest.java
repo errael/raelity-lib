@@ -128,6 +128,11 @@ private final List<ScreenItem> initialScreenItems
 )));
 // When the screens are sorted expect 0 - 11 from initialScreenItems
 private final List<Integer> expectedOrder = IntStream.range(0, 12).boxed().toList();
+List<List<Integer>> expectedLayoutIndexes = List.of(
+    List.of(0, 1, 2, 3),
+    List.of(4, 5, 6, 7),
+    List.of(8, 9, 10, 11)
+);
 
 private final Random random = new Random(37);
 /** return randomized list of ScreenItem. */
@@ -160,6 +165,23 @@ public void testScreenOrderGetScreenSort()
         .map(randomItem -> randomItem.getIndex())
         .toList();
     assertEquals(expectedOrder, result);
+    List<List<Integer>> screenLayoutIndexes = ScreenOrder.screenLayoutIndex(sorted);
+    // map back to actual layout indexes
+    List<List<Integer>> layoutIndexes = new ArrayList<>(screenLayoutIndexes.size());
+    StringBuilder stringRep = new StringBuilder();
+    for(List<Integer> listIdx : screenLayoutIndexes) {
+        List<Integer> gcRow
+            = listIdx.stream().map(idx -> randomItems.get(idx).getIndex()).toList();
+        layoutIndexes.add(gcRow);
+        stringRep.append("    ").append(gcRow.toString()).append('\n');
+    }
+    layoutIndexes = Collections.unmodifiableList(layoutIndexes);
+    assertEquals(expectedLayoutIndexes, layoutIndexes);
+
+    System.out.printf("Layout:\n%s", stringRep.toString());
+
+    //List<List<GraphicsConfiguration>> screenLayout = ScreenOrder.getScreenLayout();
+    System.out.println("");
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -192,7 +214,7 @@ public void testGetPrefGraphicsConfiguration()
 {
     System.out.println("getPrefGraphicsConfiguration");
     GraphicsConfiguration expResult = null;
-    GraphicsConfiguration result = Screens.getPrefGraphicsConfiguration();
+    GraphicsConfiguration result = Screens.getPrefScreen();
     assertEquals(expResult, result);
     // TODO review the generated test code and remove the default call to fail.
     fail("The test case is a prototype.");
@@ -222,7 +244,7 @@ public void testTranslateToPrefScreen_Window_Point()
     System.out.println("translateToPrefScreen");
     Window window = null;
     Point target = null;
-    Screens.translateToPrefScreen(window, target);
+    Screens.translateToScreen(window, target);
     // TODO review the generated test code and remove the default call to fail.
     fail("The test case is a prototype.");
 }

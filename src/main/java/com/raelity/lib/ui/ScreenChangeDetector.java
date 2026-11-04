@@ -11,6 +11,7 @@
 
 package com.raelity.lib.ui;
 
+import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
@@ -26,17 +27,19 @@ import java.util.List;
 final class ScreenChangeDetector {
     /** Returned by poll, use it to detect a change. */
     private int generation;
-    private List<Rectangle> lastBounds;
+    private List<Rectangle> lastScreenBounds;
     private GraphicsDevice[] lastDevices;
-    private List<ScreenOrder.ScreenItem> lastSort;
+    private List<ScreenOrder.ScreenItem> lastScreenItemSort;
+    private List<List<GraphicsConfiguration>> lastScreenLayout;
 
     /** Returns true, and remembers the new state, if the bounds changed. */
     synchronized int poll() {
-        GraphicsDevice[] devs = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
-        if(lastBounds != null && devs.length == lastBounds.size()) {
+        GraphicsDevice[] devs
+            = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
+        if(lastScreenBounds != null && devs.length == lastScreenBounds.size()) {
             int i = 0;
             while(i < devs.length &&
-                devs[i].getDefaultConfiguration().getBounds().equals(lastBounds.get(i)))
+                devs[i].getDefaultConfiguration().getBounds().equals(lastScreenBounds.get(i)))
                 i++;
             if(i == devs.length)
                 return generation;
@@ -44,25 +47,41 @@ final class ScreenChangeDetector {
         // A screen change has been detected, bump generation, update cached items.
         generation++;
         lastDevices = devs;
-        lastBounds = ScreenOrder.boundsOf(devs); // make unmodifiable if exposed
-        lastSort = Collections.unmodifiableList(ScreenOrder.screenSort(lastBounds));
+        lastScreenBounds = ScreenOrder.screenBoundsOf(devs); // make unmodifiable if exposed
+        lastScreenItemSort = Collections.unmodifiableList(ScreenOrder.screenSort(lastScreenBounds));
         Screens.initVirtualParams();
+
+        // Get list of rows of indexes into devs.
+        List<List<Integer>> screenLayoutIndexes = ScreenOrder.screenLayoutIndex(lastScreenItemSort);
+        lastScreenLayout = new ArrayList<>(screenLayoutIndexes.size());
+        for(List<Integer> listIdx : screenLayoutIndexes) {
+          List<GraphicsConfiguration> gcRow
+              = listIdx.stream().map(idx -> devs[idx].getDefaultConfiguration()).toList();
+          lastScreenLayout.add(gcRow);
+        }
+        lastScreenLayout = Collections.unmodifiableList(lastScreenLayout);
         return generation;
     }
 
-    synchronized List<GraphicsDevice> getScreenSort() {
+    synchronized List<GraphicsConfiguration> getScreenSort() {
         poll();
-        List<GraphicsDevice> result = new ArrayList<>(lastSort.size());
-        lastSort.forEach(screenItem -> result.add(lastDevices[screenItem.getIndex()]));
+        List<GraphicsConfiguration> result = new ArrayList<>(lastScreenItemSort.size());
+        lastScreenItemSort.forEach(screenItem
+            -> result.add(lastDevices[screenItem.getIndex()].getDefaultConfiguration()));
         return result;
     }
 
     synchronized GraphicsDevice getGraphicsDevice(int screenIdx) {
         poll();
         GraphicsDevice gdev = null;
-        if(screenIdx >= 0 && screenIdx < lastSort.size())
-            gdev = lastDevices[lastSort.get(screenIdx).getIndex()];
+        if(screenIdx >= 0 && screenIdx < lastScreenItemSort.size())
+            gdev = lastDevices[lastScreenItemSort.get(screenIdx).getIndex()];
         return gdev;
+    }
+
+    synchronized List<List<GraphicsConfiguration>> getScreenLayout() {
+      poll();
+      return lastScreenLayout;
     }
 }
 // vi: set sw=2 ts=8:
