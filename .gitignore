@@ -1,0 +1,12 @@
+# Keep in sync with .hgignore
+/target/
+*.log
+.flattened-pom.xml
+
+*~
+*.sw[pmno]
+*.orig
+*.orig.*
+*.rej
+
+/tags
