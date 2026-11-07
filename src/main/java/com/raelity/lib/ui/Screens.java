@@ -15,6 +15,7 @@ import java.awt.Dimension;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.HeadlessException;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
@@ -35,35 +36,48 @@ import java.util.List;
  * use {@link GraphicsConfiguration#getDevice()} as needed.
  * Many methods have two forms, one operates on a specified screen and the other
  * that operates on the default screen. The default can be set
- * with {@link #setPrefGraphicsDev(String)} or {@link #setPrefGraphicsDev(int)}.
+ * with {@link #setPrefScreen(String)} or {@link #setPrefScreen(int)}.
  * If not set it defaults to "JAVA_PREFERRED_SCREEN";
  * if the index is not present or out of bound then
  * {@link GraphicsEnvironment#getDefaultScreenDevice()}.{@link GraphicsDevice#getDefaultConfiguration() getDefaultConfiguration()}
  * is used.
+ * <p>
+ * The screens are checked for changes on each call; an index from an earlier
+ * call may be out of range, it is handled like any other out of range index.
+ * <p>
+ * <b>No screens.</b> When there are no screens, for example
+ * {@link GraphicsEnvironment#isHeadless() headless}, {@link #hasScreens()}
+ * is false; the lists are empty, the index methods return -1,
+ * {@link #setPrefScreen(int)} returns null and
+ * the Point translate methods return the location unchanged. Methods that
+ * must return a screen, device or bounds throw {@link HeadlessException}.
  */
 // TODO: should examine/validate for multithreading
 public class Screens {
   private Screens() {
   }
-  private static boolean isVirtual;
-  private static Rectangle virtualBounds;
 
-  static {
-    initVirtualParams();
+  /**
+   * Check if there are any screens; there are none when headless.
+   * When false, methods that return a screen throw HeadlessException.
+   * @return true if there is at least one screen
+   */
+  public static boolean hasScreens() {
+    return ScreenOrder.snapshot().size() > 0;
   }
 
   /**
-   *
+   * A virtual environment has a screen whose origin is not (0,0).
    * @return true if virtual
    */
   public static boolean isVirtualEnvironment() {
-    return isVirtual;
+    return ScreenOrder.snapshot().isVirtual();
   }
 
   /**
    * The screens in sorted order; see {@link #getScreenLayout() }.
    * The elements are obtained by {@link GraphicsDevice#getDefaultConfiguration() }.
-   * @return 
+   * @return unmodifiable list of screens, empty if no screens
    */
   public static List<GraphicsConfiguration> getScreenSort() {
     return ScreenOrder.getScreenSort();
@@ -73,7 +87,7 @@ public class Screens {
    * The screens are laid out as a list of rows;
    * each row is a list of {@link GraphicsConfiguration}s (screens) left-to-right.
    * The elements are obtained by {@link GraphicsDevice#getDefaultConfiguration() }.
-   * @return 
+   * @return unmodifiable list of unmodifiable rows, empty if no screens
    */
   public static List<List<GraphicsConfiguration>> getScreenLayout() {
     return ScreenOrder.getScreenLayout();
@@ -81,33 +95,28 @@ public class Screens {
 
   /**
    * Return index into linear list of screens.
-   * Both row and indexIntoRow are pegged at any edge if out of range.
-   * @param _row
-   * @param _indexInRow
-   * @return 
+   * Both row and indexInRow are pegged at any edge if out of range.
+   * @param _row row in {@link #getScreenLayout()}
+   * @param _indexInRow index in the row
+   * @return index into {@link #getScreenSort()}, -1 if no screens
    */
   public static int getIndex(int _row, int _indexInRow) {
     List<List<GraphicsConfiguration>> screenLayout = getScreenLayout();
-    int row = _row < 0 ? 0 : _row >= screenLayout.size()
-                             ? screenLayout.size() -1 : _row;
-    int indexInRow = _indexInRow < 0 ? 0 : _indexInRow;
-    List<GraphicsConfiguration> rowList = null;
+    if(screenLayout.isEmpty())
+      return -1;
+    int row = Math.max(0, Math.min(_row, screenLayout.size() - 1));
     // index into single/linear list
     int index = 0;
-    for(int rowIndex = 0; rowIndex < screenLayout.size(); rowIndex++) {
-      rowList = screenLayout.get(rowIndex);
-      if (row == rowIndex)
-        break;
-      index += rowList.size();
-    }
-    assert rowList != null;
-    if (indexInRow >= rowList.size())
-      indexInRow = rowList.size() - 1;
+    for(int rowIndex = 0; rowIndex < row; rowIndex++)
+      index += screenLayout.get(rowIndex).size();
+    int rowSize = screenLayout.get(row).size();
+    int indexInRow = Math.max(0, Math.min(_indexInRow, rowSize - 1));
     return index + indexInRow;
   }
 
   /**
    * @return default graphics configuration of the preferred device
+   * @throws HeadlessException if no screens
    * @deprecated use getPrefScreen
    */
   @Deprecated
@@ -117,6 +126,7 @@ public class Screens {
 
   /**
    * @return default graphics configuration of the preferred device
+   * @throws HeadlessException if no screens
    */
   public static GraphicsConfiguration getPrefScreen() {
     return getPrefGraphicsDev().getDefaultConfiguration();
@@ -125,15 +135,26 @@ public class Screens {
   /**
    * Get the indexed GraphicsConfiguration in sorted list; if index is out
    * of range, get the default screen's GraphicConfiguration.
+   * <p>
+   * Note that a bad index is not reported; the default screen is returned.
+   * An index from an earlier call is out of range if screens were removed.
    * @param index index into sorted list
    * @return the indexed GraphicsConfiguration in sorted list, or default
+   * @throws HeadlessException if no screens
    */
   public static GraphicsConfiguration getScreen(int index) {
     List<GraphicsConfiguration> screenSort = ScreenOrder.getScreenSort();
     if (index < 0 || index >= screenSort.size())
-      return GraphicsEnvironment.getLocalGraphicsEnvironment()
-          .getDefaultScreenDevice().getDefaultConfiguration();
+      return defaultScreenDevice().getDefaultConfiguration();
     return screenSort.get(index);
+  }
+
+  /** @throws HeadlessException if no screens */
+  private static GraphicsDevice defaultScreenDevice() {
+    GraphicsDevice gdev = ScreenOrder.getDefaultScreenDevice();
+    if(gdev == null)
+      throw new HeadlessException("No screens");
+    return gdev;
   }
 
   /**
@@ -161,9 +182,9 @@ public class Screens {
    * then translate it to the preferred screen.
    *
    * @param window
+   * @throws HeadlessException if no screens
    */
   public static void translateToPrefScreen(Window window) {
-    //window.setLocation(translateToScreen(window.getLocation(), getPrefGraphicsConfiguration()));
     translateToScreen(window, getPrefScreen());
   }
 
@@ -187,9 +208,6 @@ public class Screens {
   @Deprecated
   public static void translateToPrefScreen(Window window, Point target) {
     translateToScreen(window, target);
-    // if(target == null)
-    //   return;
-    // window.setLocation(translateToScreen(window.getLocation(), target));
   }
 
   /** If Window is not on the same screen as target, then translate Window to
@@ -204,27 +222,29 @@ public class Screens {
     window.setLocation(translateToScreen(window.getLocation(), target));
   }
 
-  /** If the location is not on the preferred screen, then translate it (the
-   * same object) to the preferred screen.
+  /** If the location is not on the preferred screen, then return a copy
+   * translated to the preferred screen.
    *
-   * @param location a point on the scre
-   * @return return for convenience, same object as argument
+   * @param location a point on the screen
+   * @return a new Point; unchanged copy if no screens
    */
   public static Point translateToPrefScreen(Point location) {
+    if(!hasScreens())
+      return new Point(location);
     return translateToScreen(location, getPrefScreen());
   }
 
-  /** If the location is not on the specified screen, then translate it (the
-   * same object) to the specified screen.
+  /** If the location is not on the specified screen, then return a copy
+   * translated to the specified screen.
    *
-   * @param _location a point on the scre
+   * @param _location a point on the screen
    * @param gc
-   * @return return for convenience, same object as argument
+   * @return a new Point; unchanged copy if no screens
    */
   public static Point translateToScreen(Point _location, GraphicsConfiguration gc) {
-    Point location = (Point)_location.clone();
+    Point location = new Point(_location);
     Rectangle targetScreenBounds = gc.getBounds();
-    if(!targetScreenBounds.contains(location)) {
+    if(!targetScreenBounds.contains(location) && hasScreens()) {
       Rectangle locScreenBounds = getGraphicsConfiguration(location).getBounds();
       location.translate(targetScreenBounds.x - locScreenBounds.x,
                          targetScreenBounds.y - locScreenBounds.y);
@@ -240,7 +260,7 @@ public class Screens {
    * @return return for convenience, same object as argument
    */
   public static Point translateToScreen(Point location, Point target) {
-    if(target == null)
+    if(target == null || !hasScreens())
       return location;
     Rectangle screenBounds = getGraphicsConfiguration(target).getBounds();
     if(!screenBounds.contains(location)) {
@@ -253,6 +273,7 @@ public class Screens {
 
   /**
    * @return screen bounds of the preferred device
+   * @throws HeadlessException if no screens
    */
   public static Rectangle getPrefScreenBounds() {
     return getPrefScreen().getBounds();
@@ -260,7 +281,9 @@ public class Screens {
 
   /**
    * @param index
-   * @return screen bounds of the specified device
+   * @return screen bounds of the specified device, or the default
+   *         screen's if index is out of range; see {@link #getScreen(int)}
+   * @throws HeadlessException if no screens
    */
   public static Rectangle getScreenBounds(int index) {
     return getScreen(index).getBounds();
@@ -270,11 +293,11 @@ public class Screens {
    * Center the window on the preferred screen.
    *
    * @param window
+   * @throws HeadlessException if no screens
    */
   public static void centerOnPrefScreen(Window window) {
     centerOnScreen(window, getPrefScreen());
   }
-
 
   /**
    * Center the window on the specified screen.
@@ -282,102 +305,119 @@ public class Screens {
    * @param window
    * @param gc target screen
    */
-  // TODO: Is this right? I guess it centers/setLocation in something
-  //       like the GraphicsConfig's Rect((0,0), screenSize).
-  //       Then translates it to the GraphicsConfig's screen.
-  //       The logic here feels messy, but might be OK.
   public static void centerOnScreen(Window window, GraphicsConfiguration gc) {
-    Dimension screenSize = gc.getBounds().getSize();
-    Dimension size = window.getSize();
-    window.setLocation((screenSize.width - size.width) / 2,
-                       (screenSize.height - size.height) / 2);
-    translateToScreen(window, gc);
+    window.setLocation(centeredLocation(gc.getBounds(), window.getSize()));
   }
 
-
-  
-  /** the preferred graphics device */
-  private static GraphicsDevice preferredGraphicsDevice = null;
-  //* {@link GraphicsEnvironment#getLocalGraphicsEnvironment#getScreenDevices()}
+  /**
+   * The location to center something of the given size in the bounds.
+   * @param bounds center in this
+   * @param size size of thing to center
+   * @return the location
+   */
+  static Point centeredLocation(Rectangle bounds, Dimension size) {
+    return new Point(bounds.x + (bounds.width - size.width) / 2,
+                     bounds.y + (bounds.height - size.height) / 2);
+  }
 
   /**
    * If there's an environment variable "JAVA_PREFERRED_SCREEN", then use that
-   * as an index into {@link GraphicsEnvironment#getScreenDevices()} and return
+   * as an index into {@link #getScreenSort()} and return
    * that device; otherwise return the default screen device.
+   * If the preferred device is no longer one of the screens, this is
+   * re-evaluated.
    *
-   * @return
+   * @return the preferred device
+   * @throws HeadlessException if no screens
    */
   public static GraphicsDevice getPrefGraphicsDev() {
-    if(preferredGraphicsDevice == null) {
-      GraphicsDevice gdev = setPrefGraphicsDev("JAVA_PREFERRED_SCREEN");
-      if(gdev == null)
-        preferredGraphicsDevice = GraphicsEnvironment
-            .getLocalGraphicsEnvironment().getDefaultScreenDevice();
+    ScreenChangeDetector detector = ScreenOrder.detector();
+    GraphicsDevice gdev = detector.getPreferredDevice();
+    if(gdev == null || !detector.snapshot().contains(gdev)) {
+      gdev = setPrefGraphicsDev(detector, getIndex("JAVA_PREFERRED_SCREEN"));
+      if(gdev == null) {
+        gdev = detector.getDefaultScreenDevice();
+        if(gdev == null)
+          throw new HeadlessException("No screens");
+        detector.setPreferredDevice(gdev);
+      }
     }
-    return preferredGraphicsDevice;
+    return gdev;
   }
 
   /**
-   * This sets the preferred graphics device, use by the methods in this class,
+   * This sets the preferred screen, used by the methods in this class,
    * according the value of the specified String. First check System properties,
    * if not found then check environment variables.
-   * If neither is found then the existing preferred device is not changed.
+   * If neither is found, or the value is not a valid index,
+   * then the existing preferred screen is not changed.
    *
    * @param vari check this property/environment variable's value
-   * @return updated preferred graphics dev or null if bad argument
+   * @return the new preferred screen or null if bad argument
    */
+  public static GraphicsConfiguration setPrefScreen(String vari) {
+    return setPrefScreen(getIndex(vari));
+  }
+
+  /**
+   * This sets the preferred screen, used by the methods in this class,
+   * according the specified value. If null is returned, then the existing
+   * preferred screen is not changed.
+   *
+   * @param screenIdx index into {@link #getScreenSort()}
+   * @return the new preferred screen or null if bad argument
+   */
+  public static GraphicsConfiguration setPrefScreen(int screenIdx) {
+    GraphicsDevice gdev = setPrefGraphicsDev(ScreenOrder.detector(), screenIdx);
+    return gdev == null ? null : gdev.getDefaultConfiguration();
+  }
+
+  /**
+   * @param vari check this property/environment variable's value
+   * @return updated preferred graphics dev or null if bad argument
+   * @deprecated use {@link #setPrefScreen(String)}
+   */
+  @Deprecated
   public static GraphicsDevice setPrefGraphicsDev(String vari) {
     return setPrefGraphicsDev(getIndex(vari));
   }
 
   /**
-   * This sets the preferred graphics device, used by the methods in this class,
-   * according the specified value. If null is returned, then the existing
-   * preferred device is not changed.
-   *
-   * @param screenIdx look for this screen device index.
+   * @param screenIdx index into {@link #getScreenSort()}
    * @return updated preferred graphics dev or null if bad argument
+   * @deprecated use {@link #setPrefScreen(int)}
    */
+  @Deprecated
   public static GraphicsDevice setPrefGraphicsDev(int screenIdx) {
-    GraphicsDevice gdev = ScreenOrder.getGraphicsDevice(screenIdx);
+    return setPrefGraphicsDev(ScreenOrder.detector(), screenIdx);
+  }
+
+  private static GraphicsDevice setPrefGraphicsDev(ScreenChangeDetector detector,
+                                                   int screenIdx) {
+    GraphicsDevice gdev = detector.getGraphicsDevice(screenIdx);
     if(gdev != null)
-      preferredGraphicsDevice = gdev;
+      detector.setPreferredDevice(gdev);
     return gdev;
   }
 
   /**
-   * Check each screen Device finding the defaultConfiguration that contains the
-   * given point. Return defaultScreenDevice if not found.
+   * Check each screen finding the one that contains the
+   * given point. Return the default screen if not found.
+   * <p>
+   * Note that a point that is not on any screen is treated as if it were
+   * on the default screen; for example, the translate methods translate it
+   * relative to the default screen's origin, the result may be off screen.
    *
    * @param location
-   * @return
+   * @return the screen containing location, else the default screen
+   * @throws HeadlessException if no screens
    */
   public static GraphicsConfiguration getGraphicsConfiguration(Point location) {
-    GraphicsDevice[] gs = GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
-    for(GraphicsDevice gd : gs) {
-      GraphicsConfiguration config = gd.getDefaultConfiguration();
+    for(GraphicsConfiguration config : ScreenOrder.getScreenSort()) {
       if(config.getBounds().contains(location))
         return config;
     }
-    return GraphicsEnvironment.getLocalGraphicsEnvironment()
-        .getDefaultScreenDevice().getDefaultConfiguration();
-  }
-
-  /** This is only invoked from ScreenOrder (or class initialization) */
-  static void initVirtualParams() {
-    Point zeroPoint = new Point();
-    virtualBounds = new Rectangle();
-    isVirtual = false;
-    GraphicsEnvironment ge = GraphicsEnvironment.
-        getLocalGraphicsEnvironment();
-    GraphicsDevice[] gs = ge.getScreenDevices();
-    for(GraphicsDevice gd : gs) {
-      for(GraphicsConfiguration gc : gd.getConfigurations()) {
-        if(!gc.getBounds().getLocation().equals(zeroPoint))
-          isVirtual = true;
-        virtualBounds = virtualBounds.union(gc.getBounds());
-      }
-    }
+    return defaultScreenDevice().getDefaultConfiguration();
   }
 }
 // vi: set sw=2 ts=8:

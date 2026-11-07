@@ -11,23 +11,15 @@
 
 package com.raelity.lib.ui;
 
-import java.awt.Font;
-import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
-import java.awt.GraphicsEnvironment;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
 import java.awt.geom.AffineTransform;
-import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -38,15 +30,11 @@ import static org.mockito.Mockito.when;
 /**
  * A fake multi-screen environment for tests; works headless.
  * <p>
- * While open, {@link GraphicsEnvironment#getLocalGraphicsEnvironment()}
- * returns a {@link FakeEnv} whose screens are set with {@link #setScreens}.
- * The screens can be changed while open, to simulate a monitor being
- * added, removed or rearranged.
- * <p>
- * Opening also resets the static state cached by {@link Screens} and
- * {@link ScreenOrder}, so each test starts clean.
- * <p>
- * The static mock is thread local; use it only from the test's thread.
+ * While open, {@link ScreenOrder} gets its devices from here, see
+ * {@link ScreenOrder#setDeviceSources}; the screens are set with
+ * {@link #setScreens} and can be changed while open, to simulate a monitor
+ * being added, removed or rearranged. Each open/close starts with a fresh
+ * change detector, so no cached state leaks between tests.
  * <pre>
  * try(FakeScreens fs = FakeScreens.open(0, new Rectangle(0, 0, 1920, 1080), ...)) {
  *   ...
@@ -55,16 +43,10 @@ import static org.mockito.Mockito.when;
  */
 final class FakeScreens implements AutoCloseable {
 
-  private final FakeEnv env = new FakeEnv();
-  private final MockedStatic<GraphicsEnvironment> mockedGE;
+  private volatile FakeDevice[] devices = new FakeDevice[0];
+  private volatile FakeDevice defaultDevice;
 
   private FakeScreens() {
-    // CALLS_REAL_METHODS: only getLocalGraphicsEnvironment is faked;
-    // in particular isHeadless() keeps its real behavior.
-    mockedGE = Mockito.mockStatic(GraphicsEnvironment.class,
-                                  Mockito.CALLS_REAL_METHODS);
-    mockedGE.when(GraphicsEnvironment::getLocalGraphicsEnvironment)
-        .thenReturn(env);
   }
 
   /**
@@ -75,13 +57,9 @@ final class FakeScreens implements AutoCloseable {
    */
   static FakeScreens open(int defaultIdx, Rectangle... bounds) {
     FakeScreens fs = new FakeScreens();
-    try {
-      fs.setScreens(defaultIdx, bounds);
-      resetStaticState();
-    } catch(RuntimeException ex) {
-      fs.close();
-      throw ex;
-    }
+    fs.setScreens(defaultIdx, bounds);
+    // like the real ones, a fresh array each time
+    ScreenOrder.setDeviceSources(() -> fs.devices.clone(), () -> fs.defaultDevice);
     return fs;
   }
 
@@ -105,65 +83,33 @@ final class FakeScreens implements AutoCloseable {
    * @param devs the devices in platform order
    */
   void setDevices(int defaultIdx, FakeDevice... devs) {
-    env.devices = devs.clone();
-    env.defaultDevice = defaultIdx < 0 ? null : env.devices[defaultIdx];
+    devices = devs.clone();
+    defaultDevice = defaultIdx < 0 ? null : devices[defaultIdx];
   }
 
-  FakeEnv env() {
-    return env;
+  /** @return the devices in platform order, a new array */
+  FakeDevice[] devices() {
+    return devices.clone();
+  }
+
+  /** @return the default device, may be null */
+  FakeDevice defaultDevice() {
+    return defaultDevice;
   }
 
   /** @return the device in platform order */
   FakeDevice dev(int platformIdx) {
-    return env.devices[platformIdx];
+    return devices[platformIdx];
   }
 
   /** @return the default config of the device in platform order */
   FakeConfig gc(int platformIdx) {
-    return env.devices[platformIdx].config;
+    return devices[platformIdx].config;
   }
 
   @Override
   public void close() {
-    try {
-      resetStaticState();
-    } finally {
-      mockedGE.close();
-    }
-  }
-
-  /**
-   * Clear the preferred screen and force the change detector to re-poll.
-   * Without this, state from one test leaks into the next.
-   */
-  static void resetStaticState() {
-    try {
-      // Force class init (which polls the environment) while mocked.
-      Screens.isVirtualEnvironment();
-      setField(Screens.class, null, "preferredGraphicsDevice", null);
-      Object detector = getField(ScreenOrder.class, null, "changeDetector");
-      // detector's poll() does a full refresh when it has no history
-      synchronized(detector) {
-        setField(ScreenChangeDetector.class, detector, "lastScreenBounds", null);
-      }
-      Screens.initVirtualParams();
-    } catch(ReflectiveOperationException ex) {
-      throw new IllegalStateException("FakeScreens: reset failed", ex);
-    }
-  }
-
-  private static Object getField(Class<?> clazz, Object obj, String name)
-      throws ReflectiveOperationException {
-    Field f = clazz.getDeclaredField(name);
-    f.setAccessible(true);
-    return f.get(obj);
-  }
-
-  private static void setField(Class<?> clazz, Object obj, String name, Object val)
-      throws ReflectiveOperationException {
-    Field f = clazz.getDeclaredField(name);
-    f.setAccessible(true);
-    f.set(obj, val);
+    ScreenOrder.resetDeviceSources();
   }
 
   /**
@@ -193,43 +139,9 @@ final class FakeScreens implements AutoCloseable {
 
   //////////////////////////////////////////////////////////////////////
   //
-  // Fakes; just enough for Screens/ScreenOrder.
+  // Fakes; just enough for Screens/ScreenOrder. They don't touch the
+  // toolkit, so they work headless.
   //
-
-  static final class FakeEnv extends GraphicsEnvironment {
-    private FakeDevice[] devices = new FakeDevice[0];
-    private FakeDevice defaultDevice;
-
-    @Override
-    public GraphicsDevice[] getScreenDevices() {
-      return devices.clone(); // like the real ones, a fresh array
-    }
-
-    @Override
-    public GraphicsDevice getDefaultScreenDevice() {
-      return defaultDevice;
-    }
-
-    @Override
-    public Graphics2D createGraphics(BufferedImage img) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Font[] getAllFonts() {
-      return new Font[0];
-    }
-
-    @Override
-    public String[] getAvailableFontFamilyNames() {
-      return new String[0];
-    }
-
-    @Override
-    public String[] getAvailableFontFamilyNames(java.util.Locale l) {
-      return new String[0];
-    }
-  }
 
   static final class FakeDevice extends GraphicsDevice {
     private final String id;

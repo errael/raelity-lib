@@ -11,6 +11,7 @@
 
 package com.raelity.lib.ui;
 
+import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.util.List;
 
@@ -19,10 +20,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Tests for {@link ScreenChangeDetector}; uses a private detector instance,
- * not the one shared by {@link ScreenOrder}/{@link Screens}.
+ * Tests for {@link ScreenChangeDetector}; uses a private detector instance
+ * on the fake devices, not the one used by {@link ScreenOrder}/{@link Screens}.
  */
 public class ScreenChangeDetectorTest {
 
@@ -36,7 +38,7 @@ public class ScreenChangeDetectorTest {
   @BeforeEach
   public void setUp() {
     fs = FakeScreens.open(1, RIGHT, LEFT);
-    detector = new ScreenChangeDetector();
+    detector = new ScreenChangeDetector(fs::devices, fs::defaultDevice);
   }
 
   @AfterEach
@@ -143,11 +145,10 @@ public class ScreenChangeDetectorTest {
   @Test
   public void testGetScreenSort() {
     assertEquals(List.of(fs.gc(1), fs.gc(0)), detector.getScreenSort());
-    // a new list each time, caller may modify it
+    // cached and unmodifiable
     List<?> sort = detector.getScreenSort();
-    assertNotSame(sort, detector.getScreenSort());
-    sort.clear();
-    assertEquals(2, detector.getScreenSort().size());
+    assertSame(sort, detector.getScreenSort());
+    assertThrows(UnsupportedOperationException.class, () -> sort.clear());
   }
 
   @Test
@@ -178,11 +179,44 @@ public class ScreenChangeDetectorTest {
   @Test
   public void testPoll_UpdatesScreensVirtual() {
     fs.setScreens(0, LEFT);
-    detector.poll();
-    assertFalse(Screens.isVirtualEnvironment());
+    assertFalse(detector.snapshot().isVirtual());
     fs.setScreens(0, LEFT, RIGHT);
-    detector.poll();
-    assertTrue(Screens.isVirtualEnvironment());
+    assertTrue(detector.snapshot().isVirtual());
+  }
+
+  @Test
+  public void testSnapshotIsConsistent() {
+    ScreenChangeDetector.Snapshot snap = detector.snapshot();
+    assertSame(snap, detector.snapshot(), "no change, same snapshot");
+    fs.setScreens(0, LEFT, RIGHT, BELOW);
+    ScreenChangeDetector.Snapshot snap2 = detector.snapshot();
+    assertNotSame(snap, snap2);
+    // the old snapshot is unchanged
+    assertEquals(2, snap.size());
+    assertEquals(2, snap.getScreenSort().size());
+    assertEquals(3, snap2.size());
+    assertTrue(snap2.contains(fs.dev(2)));
+    assertFalse(snap.contains(fs.dev(2)));
+  }
+
+  @Test
+  public void testGetDefaultScreenDevice() {
+    assertSame(fs.dev(1), detector.getDefaultScreenDevice());
+    fs.setDevices(-1);
+    assertNull(detector.getDefaultScreenDevice());
+  }
+
+  /** The default detector, headless, has no screens and doesn't throw. */
+  @Test
+  public void testDefault_Headless() {
+    assumeTrue(GraphicsEnvironment.isHeadless(), "not headless");
+    ScreenChangeDetector real = ScreenChangeDetector.createDefault();
+    assertEquals(0, real.snapshot().size());
+    assertEquals(List.of(), real.getScreenSort());
+    assertEquals(List.of(), real.getScreenLayout());
+    assertNull(real.getGraphicsDevice(0));
+    assertNull(real.getDefaultScreenDevice());
+    assertFalse(real.snapshot().isVirtual());
   }
 }
 // vi: set sw=2 ts=8:

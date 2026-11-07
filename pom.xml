@@ -151,7 +151,8 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
         <configuration>
-          <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
+          <!-- headless: tests use fake screens; same results on a desktop as CI -->
+          <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} -Xshare:off -Djava.awt.headless=true</argLine>
         </configuration>
       </plugin>
     </plugins>

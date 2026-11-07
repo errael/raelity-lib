@@ -234,7 +234,7 @@ public class ScreenOrderTest {
     Rectangle a = new Rectangle(1920, 0, 1920, 1080);
     Rectangle b = new Rectangle(0, 0, 1920, 1080);
     try(FakeScreens fs = FakeScreens.open(1, a, b)) {
-      GraphicsDevice[] devs = fs.env().getScreenDevices();
+      GraphicsDevice[] devs = fs.devices();
       assertEquals(List.of(a, b), ScreenOrder.screenBoundsOf(devs));
       assertEquals(List.of(), ScreenOrder.screenBoundsOf(new GraphicsDevice[0]));
     }
