@@ -11,7 +11,10 @@
 
 package com.raelity.lib.ui;
 
+import java.awt.Dimension;
 import java.awt.GraphicsConfiguration;
+import java.awt.GraphicsEnvironment;
+import java.awt.HeadlessException;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
@@ -19,7 +22,6 @@ import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +33,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * Tests for {@link Screens}, run against a fake GraphicsEnvironment,
+ * Tests for {@link Screens}, run against fake screens,
  * see {@link FakeScreens}; these work headless.
  * <p>
  * Most tests use this layout; the platform order is deliberately not the
@@ -66,6 +68,16 @@ public class ScreensTest {
   @BeforeEach
   public void setUp() {
     fs = FakeScreens.open(P, R_BOUNDS, B_BOUNDS, P_BOUNDS);
+    clearPrefScreen();
+  }
+
+  /**
+   * A system property takes precedence over an environment variable;
+   * an invalid index means use the default screen. This keeps the
+   * developer's JAVA_PREFERRED_SCREEN environment variable out of the tests.
+   */
+  private static void clearPrefScreen() {
+    System.setProperty(PREF_SCREEN, "-1");
   }
 
   @AfterEach
@@ -169,11 +181,9 @@ public class ScreensTest {
   @Test
   public void testIsVirtualEnvironment_SingleScreen() {
     fs.setScreens(0, P_BOUNDS);
-    Screens.getScreenSort(); // isVirtualEnvironment doesn't poll for changes
     assertFalse(Screens.isVirtualEnvironment());
 
     fs.setScreens(0, R_BOUNDS); // single screen, not at origin
-    Screens.getScreenSort();
     assertTrue(Screens.isVirtualEnvironment());
   }
 
@@ -233,7 +243,6 @@ public class ScreensTest {
 
   @Test
   public void testGetPrefGraphicsDev_Default() {
-    assumeTrue(System.getenv(PREF_SCREEN) == null, PREF_SCREEN + " is set");
     assertSame(fs.dev(P), Screens.getPrefGraphicsDev());
     assertSame(gc(P), Screens.getPrefScreen());
     assertEquals(P_BOUNDS, Screens.getPrefScreenBounds());
@@ -258,45 +267,58 @@ public class ScreensTest {
   }
 
   @Test
-  public void testSetPrefGraphicsDev_Int() {
-    assertSame(fs.dev(R), Screens.setPrefGraphicsDev(1));
+  public void testSetPrefScreen_Int() {
+    assertSame(gc(R), Screens.setPrefScreen(1));
     assertSame(fs.dev(R), Screens.getPrefGraphicsDev());
     assertSame(gc(R), Screens.getPrefScreen());
     assertEquals(R_BOUNDS, Screens.getPrefScreenBounds());
 
-    assertSame(fs.dev(B), Screens.setPrefGraphicsDev(2));
+    assertSame(gc(B), Screens.setPrefScreen(2));
     assertSame(fs.dev(B), Screens.getPrefGraphicsDev());
 
-    assertSame(fs.dev(P), Screens.setPrefGraphicsDev(0));
+    assertSame(gc(P), Screens.setPrefScreen(0));
     assertSame(fs.dev(P), Screens.getPrefGraphicsDev());
   }
 
   @Test
-  public void testSetPrefGraphicsDev_Int_Bad() {
-    Screens.setPrefGraphicsDev(1);
-    assertNull(Screens.setPrefGraphicsDev(-1));
-    assertNull(Screens.setPrefGraphicsDev(3));
+  public void testSetPrefScreen_Int_Bad() {
+    Screens.setPrefScreen(1);
+    assertNull(Screens.setPrefScreen(-1));
+    assertNull(Screens.setPrefScreen(3));
     assertSame(fs.dev(R), Screens.getPrefGraphicsDev(), "unchanged");
   }
 
   @Test
-  public void testSetPrefGraphicsDev_String() {
+  public void testSetPrefScreen_String() {
     String vari = prop("pref");
-    assertNull(Screens.setPrefGraphicsDev(vari)); // not set
+    assertNull(Screens.setPrefScreen(vari)); // not set
 
     System.setProperty(vari, "100");
-    assertNull(Screens.setPrefGraphicsDev(vari));
+    assertNull(Screens.setPrefScreen(vari));
 
     System.setProperty(vari, "junk");
-    assertNull(Screens.setPrefGraphicsDev(vari));
+    assertNull(Screens.setPrefScreen(vari));
 
     System.setProperty(vari, "1");
-    assertSame(fs.dev(R), Screens.setPrefGraphicsDev(vari));
+    assertSame(gc(R), Screens.setPrefScreen(vari));
     assertSame(fs.dev(R), Screens.getPrefGraphicsDev());
 
     System.setProperty(vari, "100");
-    assertNull(Screens.setPrefGraphicsDev(vari));
+    assertNull(Screens.setPrefScreen(vari));
     assertSame(fs.dev(R), Screens.getPrefGraphicsDev(), "unchanged");
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testSetPrefGraphicsDev_Deprecated() {
+    assertSame(fs.dev(R), Screens.setPrefGraphicsDev(1));
+    assertSame(fs.dev(R), Screens.getPrefGraphicsDev());
+    assertNull(Screens.setPrefGraphicsDev(3));
+    assertSame(fs.dev(R), Screens.getPrefGraphicsDev(), "unchanged");
+    String vari = prop("pref");
+    System.setProperty(vari, "2");
+    assertSame(fs.dev(B), Screens.setPrefGraphicsDev(vari));
+    assertSame(gc(B), Screens.getPrefScreen());
   }
 
   //////////////////////////////////////////////////////////////////////
@@ -351,8 +373,7 @@ public class ScreensTest {
   }
 
   /**
-   * The javadoc says "translate it (the same object)" and "same object as
-   * argument"; but it returns a copy. Pin the actual behavior; contrast with
+   * Returns a copy; contrast with
    * {@link #testTranslateToScreen_PointPoint_MutatesArgument()}.
    */
   @Test
@@ -372,7 +393,7 @@ public class ScreensTest {
   @Test
   public void testTranslateToPrefScreen_Point() {
     assertEquals(new Point(100, 100), Screens.translateToPrefScreen(new Point(2020, 100)));
-    Screens.setPrefGraphicsDev(2); // B
+    Screens.setPrefScreen(2); // B
     assertEquals(new Point(100, 1180), Screens.translateToPrefScreen(new Point(2020, 100)));
   }
 
@@ -462,7 +483,7 @@ public class ScreensTest {
     Window w = window();
     Screens.translateToPrefScreen(w); // pref is P, already there
     assertEquals(new Point(100, 100), w.getLocation());
-    Screens.setPrefGraphicsDev(1); // R
+    Screens.setPrefScreen(1); // R
     Screens.translateToPrefScreen(w);
     assertEquals(new Point(2020, 100), w.getLocation());
   }
@@ -496,7 +517,7 @@ public class ScreensTest {
     Window w = window();
     Screens.centerOnPrefScreen(w);
     assertEquals(centered(P_BOUNDS, 800, 600), w.getLocation());
-    Screens.setPrefGraphicsDev(1); // R
+    Screens.setPrefScreen(1); // R
     Screens.centerOnPrefScreen(w);
     assertEquals(centered(R_BOUNDS, 800, 600), w.getLocation());
   }
@@ -509,20 +530,34 @@ public class ScreensTest {
   }
 
   /**
-   * centerOnScreen first centers relative to (0,0), then translates from
-   * whatever screen that point happens to be on. When the window is larger
+   * centerOnScreen used to center relative to (0,0), then translate from
+   * whatever screen that point happened to be on. When the window is larger
    * than the screen, the relative point is negative; if there is a screen
-   * up and to the left, it's on that screen and the translation is wrong.
-   * Expected (-40,-60), actual (1880,1020).
+   * up and to the left, the translation was wrong: (1880,1020).
    */
   @Test
-  @Disabled("centerOnScreen bug: oversize window with a screen up-left of origin")
   public void testCenterOnScreen_WindowLargerThanScreen_ScreenUpLeft() {
     Rectangle upLeft = new Rectangle(-1920, -1080, 1920, 1080);
     fs.setScreens(0, P_BOUNDS, upLeft);
     Window w = FakeScreens.mockWindow(new Rectangle(0, 0, 2000, 1200));
     Screens.centerOnScreen(w, gc(0));
     assertEquals(centered(P_BOUNDS, 2000, 1200), w.getLocation());
+  }
+
+  @Test
+  public void testCenteredLocation() {
+    assertEquals(new Point(560, 240),
+                 Screens.centeredLocation(P_BOUNDS, new Dimension(800, 600)));
+    assertEquals(new Point(2800, 420),
+                 Screens.centeredLocation(R_BOUNDS, new Dimension(800, 600)));
+    assertEquals(new Point(-40, 1020),
+                 Screens.centeredLocation(B_BOUNDS, new Dimension(2000, 1200)));
+    assertEquals(new Point(-1920, -1080),
+                 Screens.centeredLocation(new Rectangle(-1920, -1080, 1920, 1080),
+                                          new Dimension(1920, 1080)));
+    // odd difference rounds toward zero
+    assertEquals(new Point(0, 0),
+                 Screens.centeredLocation(new Rectangle(0, 0, 11, 11), new Dimension(10, 10)));
   }
 
   //////////////////////////////////////////////////////////////////////
@@ -540,7 +575,7 @@ public class ScreensTest {
     assertEquals(List.of(List.of(gc(R), gc(P)), List.of(gc(B))),
                  Screens.getScreenLayout());
     assertSame(gc(R), Screens.getScreen(0));
-    assertSame(fs.dev(R), Screens.setPrefGraphicsDev(0));
+    assertSame(gc(R), Screens.setPrefScreen(0));
   }
 
   @Test
@@ -549,8 +584,27 @@ public class ScreensTest {
     fs.setScreens(1, R_BOUNDS, P_BOUNDS); // B unplugged
     assertEquals(List.of(gc(1), gc(0)), Screens.getScreenSort());
     assertEquals(List.of(List.of(gc(1), gc(0))), Screens.getScreenLayout());
-    assertNull(Screens.setPrefGraphicsDev(2));
+    assertNull(Screens.setPrefScreen(2));
     assertEquals(1, Screens.getIndex(99, 99));
+  }
+
+  /** The preferred device is re-evaluated when its screen goes away. */
+  @Test
+  public void testScreenChange_PreferredScreenRemoved() {
+    assertSame(gc(B), Screens.setPrefScreen(2));
+    fs.setScreens(1, R_BOUNDS, P_BOUNDS); // B unplugged
+    assertSame(fs.dev(1), Screens.getPrefGraphicsDev(), "default");
+    assertSame(fs.gc(1), Screens.getPrefScreen());
+  }
+
+  /** The preferred device is kept when the screens are rearranged. */
+  @Test
+  public void testScreenChange_PreferredScreenKept() {
+    FakeScreens.FakeDevice r = fs.dev(R);
+    assertSame(r.getDefaultConfiguration(), Screens.setPrefScreen(1));
+    r.setBounds(new Rectangle(-2560, 0, 2560, 1440));
+    assertSame(r, Screens.getPrefGraphicsDev());
+    assertSame(r, Screens.getScreen(0).getDevice());
   }
 
   @Test
@@ -575,7 +629,7 @@ public class ScreensTest {
     fs.setScreens(1, R_BOUNDS, P_BOUNDS); // B unplugged
     assertSame(gc(1), Screens.getScreen(idx), "default screen");
     assertEquals(P_BOUNDS, Screens.getScreenBounds(idx));
-    assertNull(Screens.setPrefGraphicsDev(idx));
+    assertNull(Screens.setPrefScreen(idx));
   }
 
   /** Out-of-range index from outside, through a property. */
@@ -584,7 +638,7 @@ public class ScreensTest {
     System.setProperty(prop("idx"), "99");
     int idx = Screens.getIndex(prop("idx"));
     assertSame(gc(P), Screens.getScreen(idx));
-    assertNull(Screens.setPrefGraphicsDev(prop("idx")));
+    assertNull(Screens.setPrefScreen(prop("idx")));
     System.setProperty(PREF_SCREEN, "99");
     assertSame(fs.dev(P), Screens.getPrefGraphicsDev());
   }
@@ -594,41 +648,67 @@ public class ScreensTest {
     fs.setDevices(-1);
     assertEquals(List.of(), Screens.getScreenSort());
     assertEquals(List.of(), Screens.getScreenLayout());
-    assertNull(Screens.setPrefGraphicsDev(0));
+    assertNull(Screens.setPrefScreen(0));
   }
 
-  /**
-   * With an empty layout, getIndex(row, col) throws NullPointerException
-   * (or AssertionError with -ea, as surefire runs). The project notes
-   * suggest returning 0, so getScreen(0) falls back to the default.
-   */
+  /** With an empty layout, getIndex(row, col) returns -1. */
   @Test
-  @Disabled("getIndex(row, col) crashes when the layout is empty")
   public void testNoScreens_GetIndexRowCol() {
     fs.setDevices(-1);
-    assertEquals(0, Screens.getIndex(0, 0));
-    assertEquals(0, Screens.getIndex(3, 3));
+    assertEquals(-1, Screens.getIndex(0, 0));
+    assertEquals(-1, Screens.getIndex(-3, 3));
+    assertEquals(-1, Screens.getIndex(3, 3));
+  }
+
+  @Test
+  public void testNoScreens() {
+    fs.setDevices(-1);
+    assertNoScreens();
+  }
+
+  /** What is documented for no screens; same as headless. */
+  private static void assertNoScreens() {
+    assertFalse(Screens.hasScreens());
+    assertFalse(Screens.isVirtualEnvironment());
+    assertEquals(List.of(), Screens.getScreenSort());
+    assertEquals(List.of(), Screens.getScreenLayout());
+    assertEquals(-1, Screens.getIndex(0, 0));
+    assertNull(Screens.setPrefScreen(0));
+    assertNull(Screens.setPrefScreen(prop("never.set")));
+
+    Point p = new Point(10, 20);
+    assertEquals(p, Screens.translateToPrefScreen(p));
+    assertSame(p, Screens.translateToScreen(p, new Point(3000, 0)));
+    assertEquals(new Point(10, 20), p);
+
+    assertThrows(HeadlessException.class, () -> Screens.getScreen(0));
+    assertThrows(HeadlessException.class, () -> Screens.getScreenBounds(0));
+    assertThrows(HeadlessException.class, () -> Screens.getPrefScreen());
+    assertThrows(HeadlessException.class, () -> Screens.getPrefScreenBounds());
+    assertThrows(HeadlessException.class, () -> Screens.getPrefGraphicsDev());
+    assertThrows(HeadlessException.class, () -> Screens.getGraphicsConfiguration(p));
+  }
+
+  @Test
+  public void testHasScreens() {
+    assertTrue(Screens.hasScreens());
+    fs.setDevices(-1);
+    assertFalse(Screens.hasScreens());
+    fs.setScreens(0, P_BOUNDS);
+    assertTrue(Screens.hasScreens());
   }
 
   /**
-   * The real environment, headless: the public API should not throw.
-   * Currently getScreenDevices() throws HeadlessException. Note that if
-   * this were the first use of Screens in the JVM, class initialization
-   * would fail and Screens would be unusable for every later test; so
-   * fix the code before enabling this.
+   * The real environment, headless: behaves as no screens. Screens doesn't
+   * touch the GraphicsEnvironment during class initialization, so this
+   * can't make Screens unusable.
    */
   @Test
-  @Disabled("Screens throws HeadlessException with the real headless environment")
-  public void testRealHeadlessDoesNotThrow() {
-    fs.close();
+  public void testRealHeadless() {
+    fs.close(); // back to the real environment
     try {
-      assumeTrue(java.awt.GraphicsEnvironment.isHeadless(), "not headless");
-      assertDoesNotThrow(() -> Screens.getScreenSort());
-      assertDoesNotThrow(() -> Screens.getScreenLayout());
-      assertDoesNotThrow(() -> Screens.getIndex(0, 0));
-      assertDoesNotThrow(() -> Screens.getScreen(0));
-      assertDoesNotThrow(() -> Screens.getPrefGraphicsDev());
-      assertDoesNotThrow(() -> Screens.isVirtualEnvironment());
+      assumeTrue(GraphicsEnvironment.isHeadless(), "not headless");
+      assertNoScreens();
     } finally {
       fs = FakeScreens.open(P, R_BOUNDS, B_BOUNDS, P_BOUNDS); // for tearDown
     }
@@ -643,8 +723,8 @@ public class ScreensTest {
   class SingleScreen {
     @BeforeEach
     public void setUp() {
-      fs.setScreens(0, P_BOUNDS);
-      FakeScreens.resetStaticState();
+      fs.close();
+      fs = FakeScreens.open(0, P_BOUNDS);
     }
 
     @Test
