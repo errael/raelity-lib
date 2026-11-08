@@ -75,8 +75,8 @@
     <!-- empty default so surefire's @{argLine} always resolves -->
     <argLine></argLine>
     <mockito.version>5.24.0</mockito.version>
-    <maven-dependency-plugin.version>3.8.1</maven-dependency-plugin.version>
-    <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
+    <maven-dependency-plugin.version>3.11.0</maven-dependency-plugin.version>
+    <maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
 
     <!-- Publish Plugins -->
     <maven-deploy-plugin.version>3.2.0</maven-deploy-plugin.version>
