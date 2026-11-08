@@ -80,7 +80,7 @@
 
     <!-- Publish Plugins -->
     <maven-deploy-plugin.version>3.2.0</maven-deploy-plugin.version>
-    <njord.version>0.9.10</njord.version>
+    <njord.version>0.10.0</njord.version>
     <njord.publisher>sonatype-central-portal</njord.publisher>
     <njord.releaseUrl>njord:template:release-sca</njord.releaseUrl>
 
