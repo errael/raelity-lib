@@ -12,6 +12,7 @@
 package com.raelity.lib.ui;
 
 import java.awt.GraphicsEnvironment;
+import java.awt.Insets;
 import java.awt.Rectangle;
 import java.util.List;
 
@@ -230,6 +231,19 @@ public class ScreenChangeDetectorTest {
     assertNull(detector.getDefaultScreenDevice());
   }
 
+  @Test
+  public void testGetScreenInsets() {
+    assertEquals(new Insets(0, 0, 0, 0), detector.getScreenInsets(fs.gc(0)));
+    Insets in = new Insets(1, 2, 3, 4);
+    ScreenChangeDetector d = new ScreenChangeDetector(fs::devices, fs::defaultDevice,
+                                                      gc -> in);
+    Insets got = d.getScreenInsets(fs.gc(0));
+    assertEquals(in, got);
+    assertNotSame(in, got, "a copy");
+    d = new ScreenChangeDetector(fs::devices, fs::defaultDevice, gc -> null);
+    assertEquals(new Insets(0, 0, 0, 0), d.getScreenInsets(fs.gc(0)), "null is none");
+  }
+
   /** The default detector, headless, has no screens and doesn't throw. */
   @Test
   public void testDefault_Headless() {
@@ -241,6 +255,7 @@ public class ScreenChangeDetectorTest {
     assertNull(real.getGraphicsDevice(0));
     assertNull(real.getDefaultScreenDevice());
     assertFalse(real.snapshot().isVirtual());
+    assertEquals(new Insets(0, 0, 0, 0), real.getScreenInsets(fs.gc(0)));
   }
 }
 // vi: set sw=2 ts=8:

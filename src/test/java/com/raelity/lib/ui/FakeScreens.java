@@ -11,8 +11,10 @@
 
 package com.raelity.lib.ui;
 
+import java.awt.Dimension;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
+import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
@@ -59,7 +61,9 @@ final class FakeScreens implements AutoCloseable {
     FakeScreens fs = new FakeScreens();
     fs.setScreens(defaultIdx, bounds);
     // like the real ones, a fresh array each time
-    ScreenOrder.setDeviceSources(() -> fs.devices.clone(), () -> fs.defaultDevice);
+    ScreenOrder.setDeviceSources(() -> fs.devices.clone(), () -> fs.defaultDevice,
+                                 gc -> gc instanceof FakeConfig fc
+                                       ? fc.insets : new Insets(0, 0, 0, 0));
     return fs;
   }
 
@@ -114,7 +118,8 @@ final class FakeScreens implements AutoCloseable {
 
   /**
    * A Mockito Window mock that remembers its location and has the given size.
-   * Only getLocation/setLocation/getSize/getX/getY are meaningful.
+   * Only getLocation/setLocation/getSize/setSize(Dimension)/getBounds/getX/getY
+   * are meaningful.
    * Creating it does not run Window's constructor, so it works headless.
    */
   static Window mockWindow(Rectangle bounds) {
@@ -134,6 +139,11 @@ final class FakeScreens implements AutoCloseable {
       r.setLocation((int)inv.getArgument(0), (int)inv.getArgument(1));
       return null;
     }).when(w).setLocation(anyInt(), anyInt());
+    doAnswer(inv -> {
+      Dimension d = inv.getArgument(0);
+      r.setSize(d);
+      return null;
+    }).when(w).setSize(any(Dimension.class));
     return w;
   }
 
@@ -155,6 +165,11 @@ final class FakeScreens implements AutoCloseable {
     /** Simulate a resolution/position change of this screen, same device. */
     void setBounds(Rectangle bounds) {
       config.bounds = new Rectangle(bounds);
+    }
+
+    /** Set the screen's insets (taskbars, panels). */
+    void setInsets(Insets insets) {
+      config.insets = (Insets)insets.clone();
     }
 
     /** Simulate a new default configuration object, same bounds. */
@@ -191,6 +206,7 @@ final class FakeScreens implements AutoCloseable {
   static final class FakeConfig extends GraphicsConfiguration {
     private final FakeDevice device;
     private Rectangle bounds;
+    private Insets insets = new Insets(0, 0, 0, 0);
 
     FakeConfig(FakeDevice device, Rectangle bounds) {
       this.device = device;

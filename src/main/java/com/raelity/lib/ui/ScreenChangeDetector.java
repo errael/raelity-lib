@@ -14,12 +14,15 @@ package com.raelity.lib.ui;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -37,6 +40,7 @@ import java.util.function.Supplier;
 final class ScreenChangeDetector {
   private final Supplier<GraphicsDevice[]> deviceSource;
   private final Supplier<GraphicsDevice> defaultDeviceSource;
+  private final Function<GraphicsConfiguration, Insets> insetsSource;
 
   /** Returned by poll, use it to detect a change. */
   private int generation;
@@ -153,14 +157,29 @@ final class ScreenChangeDetector {
    */
   ScreenChangeDetector(Supplier<GraphicsDevice[]> deviceSource,
                        Supplier<GraphicsDevice> defaultDeviceSource) {
+    this(deviceSource, defaultDeviceSource, gc -> new Insets(0, 0, 0, 0));
+  }
+
+  /**
+   * @param deviceSource the screens in platform order; never null,
+   *                     may be empty
+   * @param defaultDeviceSource the default screen; null if no screens
+   * @param insetsSource a screen's insets (taskbars, panels); not cached,
+   *                     they may change at any time
+   */
+  ScreenChangeDetector(Supplier<GraphicsDevice[]> deviceSource,
+                       Supplier<GraphicsDevice> defaultDeviceSource,
+                       Function<GraphicsConfiguration, Insets> insetsSource) {
     this.deviceSource = Objects.requireNonNull(deviceSource);
     this.defaultDeviceSource = Objects.requireNonNull(defaultDeviceSource);
+    this.insetsSource = Objects.requireNonNull(insetsSource);
   }
 
   /** Use the local graphics environment; headless has no screens. */
   static ScreenChangeDetector createDefault() {
     return new ScreenChangeDetector(ScreenChangeDetector::localScreenDevices,
-                                    ScreenChangeDetector::localDefaultScreenDevice);
+                                    ScreenChangeDetector::localDefaultScreenDevice,
+                                    ScreenChangeDetector::localScreenInsets);
   }
 
   // These throw HeadlessException only if isHeadless() is true.
@@ -175,6 +194,18 @@ final class ScreenChangeDetector {
     if(GraphicsEnvironment.isHeadless())
       return null;
     return GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+  }
+
+  private static Insets localScreenInsets(GraphicsConfiguration gc) {
+    if(GraphicsEnvironment.isHeadless())
+      return new Insets(0, 0, 0, 0);
+    return Toolkit.getDefaultToolkit().getScreenInsets(gc);
+  }
+
+  /** @return the screen's insets, never null */
+  Insets getScreenInsets(GraphicsConfiguration gc) {
+    Insets insets = insetsSource.apply(gc);
+    return insets == null ? new Insets(0, 0, 0, 0) : (Insets)insets.clone();
   }
 
   /** Check for a change, update the snapshot if needed and return it. */
