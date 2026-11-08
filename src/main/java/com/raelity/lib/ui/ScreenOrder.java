@@ -13,10 +13,12 @@ package com.raelity.lib.ui;
 
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
+import java.awt.Insets;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 //
@@ -142,6 +144,18 @@ final class ScreenOrder {
     detector = new ScreenChangeDetector(devices, defaultDevice);
   }
 
+  /**
+   * Like {@link #setDeviceSources(Supplier, Supplier)}, with screen insets.
+   * @param devices the screens in platform order
+   * @param defaultDevice the default screen
+   * @param insets a screen's insets
+   */
+  static void setDeviceSources(Supplier<GraphicsDevice[]> devices,
+                               Supplier<GraphicsDevice> defaultDevice,
+                               Function<GraphicsConfiguration, Insets> insets) {
+    detector = new ScreenChangeDetector(devices, defaultDevice, insets);
+  }
+
   /** Go back to the local GraphicsEnvironment, with a fresh detector. */
   static void resetDeviceSources() {
     detector = ScreenChangeDetector.createDefault();
@@ -176,6 +190,11 @@ final class ScreenOrder {
   /** @return unmodifiable list of unmodifiable rows */
   public static List<List<GraphicsConfiguration>> getScreenLayout() {
     return detector.getScreenLayout();
+  }
+
+  /** @return the screen's insets (taskbars, panels); never null */
+  static Insets getScreenInsets(GraphicsConfiguration gc) {
+    return detector.getScreenInsets(gc);
   }
 
   /** @return the default screen device, null if no screens (headless) */

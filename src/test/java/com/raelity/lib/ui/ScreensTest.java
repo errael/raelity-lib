@@ -12,9 +12,11 @@
 package com.raelity.lib.ui;
 
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
 import java.awt.HeadlessException;
+import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
@@ -31,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link Screens}, run against fake screens,
@@ -161,11 +164,11 @@ public class ScreensTest {
   }
 
   @Test
-  public void testGetScreenBounds() {
-    assertEquals(P_BOUNDS, Screens.getScreenBounds(0));
-    assertEquals(R_BOUNDS, Screens.getScreenBounds(1));
-    assertEquals(B_BOUNDS, Screens.getScreenBounds(2));
-    assertEquals(P_BOUNDS, Screens.getScreenBounds(3)); // default
+  public void testGetScreen_Bounds() {
+    assertEquals(P_BOUNDS, Screens.getScreen(0).getBounds());
+    assertEquals(R_BOUNDS, Screens.getScreen(1).getBounds());
+    assertEquals(B_BOUNDS, Screens.getScreen(2).getBounds());
+    assertEquals(P_BOUNDS, Screens.getScreen(3).getBounds()); // default
   }
 
   //////////////////////////////////////////////////////////////////////
@@ -197,7 +200,9 @@ public class ScreensTest {
     System.setProperty(prop("idx"), "2");
     assertEquals(2, Screens.getIndex(prop("idx")));
     System.setProperty(prop("idx"), "-7");
-    assertEquals(-7, Screens.getIndex(prop("idx")));
+    assertEquals(-1, Screens.getIndex(prop("idx")), "any negative is -1");
+    System.setProperty(prop("idx"), "0");
+    assertEquals(0, Screens.getIndex(prop("idx")));
   }
 
   @Test
@@ -243,41 +248,35 @@ public class ScreensTest {
 
   @Test
   public void testGetPrefGraphicsDev_Default() {
-    assertSame(fs.dev(P), Screens.getPrefGraphicsDev());
+    assertSame(fs.gc(P), Screens.getPrefScreen());
     assertSame(gc(P), Screens.getPrefScreen());
-    assertEquals(P_BOUNDS, Screens.getPrefScreenBounds());
-  }
-
-  @Test
-  @SuppressWarnings("deprecation")
-  public void testGetPrefGraphicsConfiguration_Deprecated() {
-    assertSame(Screens.getPrefScreen(), Screens.getPrefGraphicsConfiguration());
+    assertEquals(P_BOUNDS, Screens.getPrefScreen().getBounds());
   }
 
   @Test
   public void testGetPrefGraphicsDev_JavaPreferredScreen() {
     System.setProperty(PREF_SCREEN, "2"); // sorted index
-    assertSame(fs.dev(B), Screens.getPrefGraphicsDev());
+    assertSame(fs.gc(B), Screens.getPrefScreen());
   }
 
   @Test
   public void testGetPrefGraphicsDev_JavaPreferredScreen_OutOfRange() {
     System.setProperty(PREF_SCREEN, "3");
-    assertSame(fs.dev(P), Screens.getPrefGraphicsDev());
+    assertSame(fs.gc(P), Screens.getPrefScreen());
   }
 
   @Test
   public void testSetPrefScreen_Int() {
     assertSame(gc(R), Screens.setPrefScreen(1));
-    assertSame(fs.dev(R), Screens.getPrefGraphicsDev());
+    assertSame(fs.gc(R), Screens.getPrefScreen());
     assertSame(gc(R), Screens.getPrefScreen());
-    assertEquals(R_BOUNDS, Screens.getPrefScreenBounds());
+    assertEquals(R_BOUNDS, Screens.getPrefScreen().getBounds());
 
     assertSame(gc(B), Screens.setPrefScreen(2));
-    assertSame(fs.dev(B), Screens.getPrefGraphicsDev());
+    assertSame(fs.gc(B), Screens.getPrefScreen());
 
     assertSame(gc(P), Screens.setPrefScreen(0));
-    assertSame(fs.dev(P), Screens.getPrefGraphicsDev());
+    assertSame(fs.gc(P), Screens.getPrefScreen());
   }
 
   @Test
@@ -285,7 +284,7 @@ public class ScreensTest {
     Screens.setPrefScreen(1);
     assertNull(Screens.setPrefScreen(-1));
     assertNull(Screens.setPrefScreen(3));
-    assertSame(fs.dev(R), Screens.getPrefGraphicsDev(), "unchanged");
+    assertSame(fs.gc(R), Screens.getPrefScreen(), "unchanged");
   }
 
   @Test
@@ -301,53 +300,45 @@ public class ScreensTest {
 
     System.setProperty(vari, "1");
     assertSame(gc(R), Screens.setPrefScreen(vari));
-    assertSame(fs.dev(R), Screens.getPrefGraphicsDev());
+    assertSame(fs.gc(R), Screens.getPrefScreen());
 
     System.setProperty(vari, "100");
     assertNull(Screens.setPrefScreen(vari));
-    assertSame(fs.dev(R), Screens.getPrefGraphicsDev(), "unchanged");
-  }
-
-  @Test
-  @SuppressWarnings("deprecation")
-  public void testSetPrefGraphicsDev_Deprecated() {
-    assertSame(fs.dev(R), Screens.setPrefGraphicsDev(1));
-    assertSame(fs.dev(R), Screens.getPrefGraphicsDev());
-    assertNull(Screens.setPrefGraphicsDev(3));
-    assertSame(fs.dev(R), Screens.getPrefGraphicsDev(), "unchanged");
-    String vari = prop("pref");
-    System.setProperty(vari, "2");
-    assertSame(fs.dev(B), Screens.setPrefGraphicsDev(vari));
-    assertSame(gc(B), Screens.getPrefScreen());
+    assertSame(fs.gc(R), Screens.getPrefScreen(), "unchanged");
   }
 
   //////////////////////////////////////////////////////////////////////
   //
-  // getGraphicsConfiguration(Point)
+  // getScreen(Point)
   //
 
   @Test
-  public void testGetGraphicsConfiguration() {
-    assertSame(gc(P), Screens.getGraphicsConfiguration(new Point(10, 10)));
-    assertSame(gc(R), Screens.getGraphicsConfiguration(new Point(2000, 10)));
-    assertSame(gc(B), Screens.getGraphicsConfiguration(new Point(10, 1100)));
+  public void testGetScreen_Point() {
+    assertSame(gc(P), Screens.getScreen(new Point(10, 10)));
+    assertSame(gc(R), Screens.getScreen(new Point(2000, 10)));
+    assertSame(gc(B), Screens.getScreen(new Point(10, 1100)));
   }
 
   @Test
-  public void testGetGraphicsConfiguration_Edges() {
+  public void testGetScreen_Point_Edges() {
     // Rectangle.contains: x <= px < x+width
-    assertSame(gc(P), Screens.getGraphicsConfiguration(new Point(0, 0)));
-    assertSame(gc(P), Screens.getGraphicsConfiguration(new Point(1919, 1079)));
-    assertSame(gc(R), Screens.getGraphicsConfiguration(new Point(1920, 0)));
-    assertSame(gc(B), Screens.getGraphicsConfiguration(new Point(0, 1080)));
-    assertSame(gc(R), Screens.getGraphicsConfiguration(new Point(4479, 1439)));
+    assertSame(gc(P), Screens.getScreen(new Point(0, 0)));
+    assertSame(gc(P), Screens.getScreen(new Point(1919, 1079)));
+    assertSame(gc(R), Screens.getScreen(new Point(1920, 0)));
+    assertSame(gc(B), Screens.getScreen(new Point(0, 1080)));
+    assertSame(gc(R), Screens.getScreen(new Point(4479, 1439)));
   }
 
   @Test
-  public void testGetGraphicsConfiguration_NotOnAnyScreen() {
-    assertSame(gc(P), Screens.getGraphicsConfiguration(new Point(-1, -1)));
-    assertSame(gc(P), Screens.getGraphicsConfiguration(new Point(4480, 0)));
-    assertSame(gc(P), Screens.getGraphicsConfiguration(new Point(2000, 2000)));
+  public void testGetScreen_Point_NotOnAnyScreen() {
+    // the nearest screen
+    assertSame(gc(P), Screens.getScreen(new Point(-1, -1)));
+    assertSame(gc(R), Screens.getScreen(new Point(4480, 0)));
+    assertSame(gc(B), Screens.getScreen(new Point(2000, 2000)), "80 from B");
+    assertSame(gc(R), Screens.getScreen(new Point(2500, 1500)), "60 from R");
+    assertSame(gc(B), Screens.getScreen(new Point(100, 5000)));
+    // tie: as far from B (x) as from R (y); first in sort order
+    assertSame(gc(R), Screens.getScreen(new Point(1940, 1460)));
   }
 
   //////////////////////////////////////////////////////////////////////
@@ -360,7 +351,6 @@ public class ScreensTest {
     Point loc = new Point(100, 100); // on P
     Point result = Screens.translateToScreen(loc, gc(R));
     assertEquals(new Point(2020, 100), result);
-    assertEquals(new Point(100, 100), loc, "argument not modified");
 
     result = Screens.translateToScreen(new Point(2020, 100), gc(B)); // R to B
     assertEquals(new Point(100, 1180), result);
@@ -369,64 +359,66 @@ public class ScreensTest {
   @Test
   public void testTranslateToScreen_PointGc_AlreadyOnScreen() {
     Point loc = new Point(2020, 100); // on R
-    assertEquals(loc, Screens.translateToScreen(loc, gc(R)));
+    assertSame(loc, Screens.translateToScreen(loc, gc(R)));
+    assertEquals(new Point(2020, 100), loc);
   }
 
-  /**
-   * Returns a copy; contrast with
-   * {@link #testTranslateToScreen_PointPoint_MutatesArgument()}.
-   */
+  /** Like AWT's translate, the argument is modified and returned. */
   @Test
-  public void testTranslateToScreen_PointGc_ReturnsCopy() {
-    Point loc = new Point(2020, 100);
-    assertNotSame(loc, Screens.translateToScreen(loc, gc(R)));
-    assertNotSame(loc, Screens.translateToScreen(loc, gc(P)));
+  public void testTranslateToScreen_PointGc_MutatesArgument() {
+    Point loc = new Point(2020, 100); // on R
+    assertSame(loc, Screens.translateToScreen(loc, gc(P)));
+    assertEquals(new Point(100, 100), loc);
+    assertSame(loc, Screens.translateToScreen(loc, gc(B)));
+    assertEquals(new Point(100, 1180), loc);
   }
 
   @Test
   public void testTranslateToScreen_PointGc_FromOffScreen() {
-    // A point on no screen is treated as being on the default screen.
-    Point result = Screens.translateToScreen(new Point(2000, 2000), gc(B));
-    assertEquals(new Point(2000, 3080), result);
+    // A point on no screen is treated as being on the nearest screen, B.
+    Point result = Screens.translateToScreen(new Point(2000, 2000), gc(P));
+    assertEquals(new Point(2000, 920), result);
+    result = Screens.translateToScreen(new Point(2000, 2000), gc(B));
+    assertEquals(new Point(2000, 2000), result, "already 'on' B");
   }
 
   @Test
-  public void testTranslateToPrefScreen_Point() {
-    assertEquals(new Point(100, 100), Screens.translateToPrefScreen(new Point(2020, 100)));
+  public void testTranslateToScreen_Point_PrefScreen() {
+    assertEquals(new Point(100, 100), Screens.translateToScreen(new Point(2020, 100), Screens.getPrefScreen()));
     Screens.setPrefScreen(2); // B
-    assertEquals(new Point(100, 1180), Screens.translateToPrefScreen(new Point(2020, 100)));
+    assertEquals(new Point(100, 1180), Screens.translateToScreen(new Point(2020, 100), Screens.getPrefScreen()));
   }
 
   @Test
-  public void testTranslateToScreen_PointPoint() {
+  public void testTranslateToScreen_Point_PrefScreen_MutatesArgument() {
+    Point loc = new Point(2020, 100); // on R, pref is P
+    assertSame(loc, Screens.translateToScreen(loc, Screens.getPrefScreen()));
+    assertEquals(new Point(100, 100), loc);
+  }
+
+  @Test
+  public void testTranslateToScreen_Point_ScreenOfPoint() {
     Point loc = new Point(100, 100); // on P
-    Point result = Screens.translateToScreen(loc, new Point(3000, 1300)); // on R
+    Point result = Screens.translateToScreen(loc, Screens.getScreen(new Point(3000, 1300))); // on R
     assertEquals(new Point(2020, 100), result);
 
-    result = Screens.translateToScreen(new Point(2020, 100), new Point(5, 2000)); // on B
+    result = Screens.translateToScreen(new Point(2020, 100), Screens.getScreen(new Point(5, 2000))); // on B
     assertEquals(new Point(100, 1180), result);
   }
 
   @Test
-  public void testTranslateToScreen_PointPoint_MutatesArgument() {
+  public void testTranslateToScreen_Point_ScreenOfPoint_MutatesArgument() {
     Point loc = new Point(100, 100);
-    Point result = Screens.translateToScreen(loc, new Point(3000, 1300));
+    Point result = Screens.translateToScreen(loc, Screens.getScreen(new Point(3000, 1300)));
     assertSame(loc, result);
     assertEquals(new Point(2020, 100), loc);
   }
 
   @Test
-  public void testTranslateToScreen_PointPoint_SameScreen() {
+  public void testTranslateToScreen_Point_ScreenOfPoint_SameScreen() {
     Point loc = new Point(2020, 100);
-    Point result = Screens.translateToScreen(loc, new Point(3000, 1300));
+    Point result = Screens.translateToScreen(loc, Screens.getScreen(new Point(3000, 1300)));
     assertSame(loc, result);
-    assertEquals(new Point(2020, 100), loc);
-  }
-
-  @Test
-  public void testTranslateToScreen_PointPoint_NullTarget() {
-    Point loc = new Point(2020, 100);
-    assertSame(loc, Screens.translateToScreen(loc, (Point)null));
     assertEquals(new Point(2020, 100), loc);
   }
 
@@ -451,31 +443,12 @@ public class ScreensTest {
   }
 
   @Test
-  public void testTranslateToScreen_WindowPoint() {
+  public void testTranslateToScreen_Window_ScreenOfPoint() {
     Window w = window();
-    Screens.translateToScreen(w, new Point(3000, 1300));
+    Screens.translateToScreen(w, Screens.getScreen(new Point(3000, 1300)));
     assertEquals(new Point(2020, 100), w.getLocation());
-    Screens.translateToScreen(w, new Point(5, 2000));
+    Screens.translateToScreen(w, Screens.getScreen(new Point(5, 2000)));
     assertEquals(new Point(100, 1180), w.getLocation());
-  }
-
-  @Test
-  public void testTranslateToScreen_WindowPoint_NullTarget() {
-    Window w = window();
-    Screens.translateToScreen(w, (Point)null);
-    verify(w, never()).setLocation(any(Point.class));
-    verify(w, never()).setLocation(anyInt(), anyInt());
-    assertEquals(new Point(100, 100), w.getLocation());
-  }
-
-  @Test
-  @SuppressWarnings("deprecation")
-  public void testTranslateToPrefScreen_WindowPoint_Deprecated() {
-    Window w = window();
-    Screens.translateToPrefScreen(w, new Point(3000, 1300));
-    assertEquals(new Point(2020, 100), w.getLocation());
-    Screens.translateToPrefScreen(w, (Point)null);
-    assertEquals(new Point(2020, 100), w.getLocation());
   }
 
   @Test
@@ -512,13 +485,31 @@ public class ScreensTest {
     assertEquals(new Rectangle(560, 1320, 800, 600), w.getBounds());
   }
 
+  /** Centered in the usable area, not under the taskbar/panel. */
   @Test
-  public void testCenterOnPrefScreen() {
+  public void testCenterOnScreen_Insets() {
+    fs.dev(P).setInsets(new Insets(30, 100, 50, 0)); // usable (100,30,1820,1000)
+    Window w = FakeScreens.mockWindow(rect(0, 0, 800, 600));
+    Screens.centerOnScreen(w, gc(P));
+    assertEquals(new Point(100 + 510, 30 + 200), w.getLocation());
+    assertTrue(Screens.isWithinScreen(w, gc(P)));
+
+    fs.dev(R).setInsets(new Insets(0, 0, 40, 0));
+    Screens.centerOnScreen(w, gc(R));
+    assertEquals(centered(rect(1920, 0, 2560, 1400), 800, 600), w.getLocation());
+
+    Screens.setPrefScreen(0); // P
+    Screens.centerOnScreen(w, Screens.getPrefScreen());
+    assertEquals(new Point(610, 230), w.getLocation());
+  }
+
+  @Test
+  public void testCenterOnScreen_PrefScreen() {
     Window w = window();
-    Screens.centerOnPrefScreen(w);
+    Screens.centerOnScreen(w, Screens.getPrefScreen());
     assertEquals(centered(P_BOUNDS, 800, 600), w.getLocation());
     Screens.setPrefScreen(1); // R
-    Screens.centerOnPrefScreen(w);
+    Screens.centerOnScreen(w, Screens.getPrefScreen());
     assertEquals(centered(R_BOUNDS, 800, 600), w.getLocation());
   }
 
@@ -562,6 +553,249 @@ public class ScreensTest {
 
   //////////////////////////////////////////////////////////////////////
   //
+  // Which screen a window is on; within and fit.
+  //
+
+  private static Rectangle rect(int x, int y, int w, int h) {
+    return new Rectangle(x, y, w, h);
+  }
+
+  @Test
+  public void testGetScreen_Rectangle() {
+    assertSame(gc(P), Screens.getScreen(rect(100, 100, 800, 600)));
+    assertSame(gc(B), Screens.getScreen(rect(100, 1200, 800, 600)));
+    // straddles P and R, mostly R
+    assertSame(gc(R), Screens.getScreen(rect(1800, 100, 800, 600)));
+    // top-left corner on P, but mostly on R
+    assertSame(gc(R), Screens.getScreen(rect(1900, 100, 800, 600)));
+    // straddles P, R and B: overlaps 9600, 112000, 38400
+    assertSame(gc(R), Screens.getScreen(rect(1800, 1000, 400, 400)));
+  }
+
+  @Test
+  public void testGetScreen_Rectangle_Tie() {
+    // equal overlap of P and B; first in sort order
+    assertSame(gc(P), Screens.getScreen(rect(100, 980, 100, 200)));
+  }
+
+  @Test
+  public void testGetScreen_Rectangle_NoOverlap() {
+    // nearest the center
+    assertSame(gc(R), Screens.getScreen(rect(5000, 100, 100, 100)));
+    assertSame(gc(B), Screens.getScreen(rect(100, 3000, 100, 100)));
+    assertSame(gc(P), Screens.getScreen(rect(-500, -500, 100, 100)));
+    // in the gap right of B, below P; nearest is B, then R
+    assertSame(gc(B), Screens.getScreen(rect(1930, 2000, 10, 10)));
+  }
+
+  @Test
+  public void testGetScreen_Rectangle_Empty() {
+    // no size, works like a point
+    assertSame(gc(R), Screens.getScreen(rect(2000, 10, 0, 0)));
+    assertSame(gc(B), Screens.getScreen(rect(10, 1100, 0, 0)));
+    // on the edge between P and R, like getScreen(Point)
+    assertSame(gc(R), Screens.getScreen(rect(1920, 10, 0, 0)));
+    assertSame(Screens.getScreen(new Point(1920, 10)), Screens.getScreen(rect(1920, 10, 0, 0)));
+  }
+
+  @Test
+  public void testGetScreen_Window() {
+    assertSame(gc(P), Screens.getScreen(FakeScreens.mockWindow(rect(100, 100, 800, 600))));
+    assertSame(gc(R), Screens.getScreen(FakeScreens.mockWindow(rect(1900, 100, 800, 600))));
+    assertSame(gc(B), Screens.getScreen(FakeScreens.mockWindow(rect(100, 5000, 800, 600))));
+  }
+
+  //////////////////////////////////////////////////////////////////////
+  //
+  // Window methods and the event dispatch thread
+  //
+
+  private static Window displayableWindow() {
+    Window w = FakeScreens.mockWindow(rect(100, 100, 800, 600));
+    when(w.isDisplayable()).thenReturn(true);
+    return w;
+  }
+
+  /** A displayable window changed off the EDT throws. */
+  @Test
+  public void testEDT_DisplayableOffEDT() {
+    assertFalse(EventQueue.isDispatchThread());
+    Window w = displayableWindow();
+    assertThrows(IllegalStateException.class, () -> Screens.translateToScreen(w, gc(R)));
+    assertThrows(IllegalStateException.class, () -> Screens.translateToPrefScreen(w));
+    assertThrows(IllegalStateException.class, () -> Screens.centerOnScreen(w, gc(R)));
+    assertThrows(IllegalStateException.class, () -> Screens.fitOnScreen(w, gc(R)));
+    assertThrows(IllegalStateException.class, () -> Screens.fitOnScreen(w, gc(R), true));
+    assertEquals(new Point(100, 100), w.getLocation(), "not moved");
+    // queries are fine
+    assertSame(gc(P), Screens.getScreen(w));
+    assertTrue(Screens.isWithinScreen(w, gc(P)));
+    assertTrue(Screens.canFitWithinScreen(w, gc(P)));
+  }
+
+  /** A displayable window changed on the EDT is fine. */
+  @Test
+  public void testEDT_DisplayableOnEDT() throws Exception {
+    Window w = displayableWindow();
+    EventQueue.invokeAndWait(() -> {
+      Screens.translateToScreen(w, gc(R));
+      Screens.fitOnScreen(w, gc(R), true);
+      Screens.centerOnScreen(w, gc(B));
+      Screens.translateToPrefScreen(w);
+    });
+    assertEquals(new Point(560, 240), w.getLocation());
+  }
+
+  /** Not displayable, for example a new frame not yet shown: any thread. */
+  @Test
+  public void testEDT_NotDisplayable() {
+    Window w = FakeScreens.mockWindow(rect(100, 100, 800, 600));
+    assertFalse(w.isDisplayable());
+    Screens.centerOnScreen(w, gc(R));
+    assertEquals(centered(R_BOUNDS, 800, 600), w.getLocation());
+  }
+
+  /** The window is on the screen it overlaps most, not its corner's screen. */
+  @Test
+  public void testTranslateToScreen_WindowMostlyOnOtherScreen() {
+    Window w = FakeScreens.mockWindow(rect(1900, 100, 800, 600)); // mostly R
+    Screens.translateToScreen(w, gc(R));
+    assertEquals(new Point(1900, 100), w.getLocation(), "already on R");
+    Screens.translateToScreen(w, gc(P));
+    assertEquals(new Point(-20, 100), w.getLocation(), "R to P");
+
+    w = FakeScreens.mockWindow(rect(1900, 100, 800, 600));
+    Screens.translateToScreen(w, gc(B));
+    assertEquals(new Point(-20, 1180), w.getLocation(), "R to B");
+
+    w = FakeScreens.mockWindow(rect(1900, 100, 800, 600));
+    Screens.translateToScreen(w, Screens.getScreen(new Point(3000, 1300))); // target on R
+    assertEquals(new Point(1900, 100), w.getLocation());
+  }
+
+  /** A configuration of the same device is the same screen. */
+  @Test
+  public void testTranslateToScreen_WindowOtherConfigSameDevice() {
+    FakeScreens.FakeConfig otherR = new FakeScreens.FakeConfig(fs.dev(R), R_BOUNDS);
+    assertNotSame(gc(R), otherR);
+    Window w = FakeScreens.mockWindow(rect(2000, 100, 800, 600));
+    Screens.translateToScreen(w, otherR);
+    assertEquals(new Point(2000, 100), w.getLocation());
+  }
+
+  @Test
+  public void testGetUsableBounds() {
+    assertEquals(P_BOUNDS, Screens.getUsableBounds(gc(P)));
+    fs.dev(P).setInsets(new Insets(30, 10, 40, 50));
+    assertEquals(rect(10, 30, 1860, 1010), Screens.getUsableBounds(gc(P)));
+    fs.dev(R).setInsets(new Insets(0, 0, 2000, 0)); // bigger than the screen
+    assertEquals(rect(1920, 0, 2560, 0), Screens.getUsableBounds(gc(R)));
+  }
+
+  @Test
+  public void testIsWithinScreen() {
+    Window w = FakeScreens.mockWindow(rect(100, 100, 800, 600));
+    assertTrue(Screens.isWithinScreen(w, gc(P)));
+    assertFalse(Screens.isWithinScreen(w, gc(R)));
+    assertTrue(Screens.isWithinScreen(P_BOUNDS, gc(P)), "exact fit");
+    assertFalse(Screens.isWithinScreen(rect(1900, 100, 800, 600), gc(P)));
+    assertFalse(Screens.isWithinScreen(rect(1900, 100, 800, 600), gc(R)));
+    fs.dev(P).setInsets(new Insets(150, 0, 0, 0));
+    assertFalse(Screens.isWithinScreen(w, gc(P)), "under the panel");
+  }
+
+  @Test
+  public void testCanFitWithinScreen() {
+    assertTrue(Screens.canFitWithinScreen(new Dimension(1920, 1080), gc(P)));
+    assertFalse(Screens.canFitWithinScreen(new Dimension(1921, 1080), gc(P)));
+    assertFalse(Screens.canFitWithinScreen(new Dimension(1920, 1081), gc(P)));
+    Window w = FakeScreens.mockWindow(rect(0, 0, 2000, 1200));
+    assertFalse(Screens.canFitWithinScreen(w, gc(P)));
+    assertTrue(Screens.canFitWithinScreen(w, gc(R)));
+    fs.dev(P).setInsets(new Insets(0, 0, 40, 0));
+    assertFalse(Screens.canFitWithinScreen(new Dimension(1920, 1080), gc(P)));
+    assertTrue(Screens.canFitWithinScreen(new Dimension(1920, 1040), gc(P)));
+  }
+
+  @Test
+  public void testFitOnScreen_Move() {
+    Window w = FakeScreens.mockWindow(rect(-20, 100, 800, 600));
+    Screens.fitOnScreen(w, gc(P));
+    assertEquals(rect(0, 100, 800, 600), w.getBounds());
+
+    w = FakeScreens.mockWindow(rect(1500, 900, 800, 600)); // off bottom right
+    Screens.fitOnScreen(w, gc(P));
+    assertEquals(rect(1120, 480, 800, 600), w.getBounds());
+    verify(w, never()).setSize(any(Dimension.class));
+
+    fs.dev(P).setInsets(new Insets(0, 0, 40, 0));
+    Screens.fitOnScreen(w, gc(P));
+    assertEquals(rect(1120, 440, 800, 600), w.getBounds(), "above the taskbar");
+  }
+
+  @Test
+  public void testFitOnScreen_AlreadyWithin() {
+    Window w = FakeScreens.mockWindow(rect(100, 100, 800, 600));
+    Screens.fitOnScreen(w, gc(P), true);
+    assertEquals(rect(100, 100, 800, 600), w.getBounds());
+    verify(w, never()).setLocation(any(Point.class));
+    verify(w, never()).setSize(any(Dimension.class));
+  }
+
+  @Test
+  public void testFitOnScreen_TooBig() {
+    Window w = FakeScreens.mockWindow(rect(100, 100, 2000, 1200));
+    Screens.fitOnScreen(w, gc(P));
+    assertEquals(rect(0, 0, 2000, 1200), w.getBounds(), "left/top edge");
+    verify(w, never()).setSize(any(Dimension.class));
+
+    w = FakeScreens.mockWindow(rect(100, 100, 2000, 1200));
+    Screens.fitOnScreen(w, gc(P), true);
+    assertEquals(P_BOUNDS, w.getBounds(), "resized");
+
+    fs.dev(P).setInsets(new Insets(30, 0, 0, 0));
+    w = FakeScreens.mockWindow(rect(100, 100, 2000, 1200));
+    Screens.fitOnScreen(w, gc(P), true);
+    assertEquals(rect(0, 30, 1920, 1050), w.getBounds());
+
+    w = FakeScreens.mockWindow(rect(100, 100, 2000, 500)); // only too wide
+    Screens.fitOnScreen(w, gc(P), true);
+    assertEquals(rect(0, 100, 1920, 500), w.getBounds());
+  }
+
+  /** The kind of thing a program might do after a translate. */
+  @Test
+  public void testTranslateThenFit() {
+    Window w = FakeScreens.mockWindow(rect(3600, 1000, 800, 400)); // on R
+    Screens.translateToScreen(w, gc(P));
+    assertEquals(rect(1680, 1000, 800, 400), w.getBounds());
+    assertFalse(Screens.isWithinScreen(w, gc(P)));
+    assertTrue(Screens.canFitWithinScreen(w, gc(P)));
+    Screens.fitOnScreen(w, gc(P));
+    assertEquals(rect(1120, 680, 800, 400), w.getBounds());
+    assertTrue(Screens.isWithinScreen(w, gc(P)));
+  }
+
+  @Test
+  public void testFittedBounds() {
+    Rectangle area = rect(-1000, -500, 1000, 500);
+    assertEquals(rect(-900, -400, 100, 100),
+                 Screens.fittedBounds(rect(-900, -400, 100, 100), area, false));
+    assertEquals(rect(-1000, -500, 100, 100),
+                 Screens.fittedBounds(rect(-5000, -5000, 100, 100), area, false));
+    assertEquals(rect(-100, -100, 100, 100),
+                 Screens.fittedBounds(rect(5000, 5000, 100, 100), area, false));
+    assertEquals(rect(-1000, -200, 2000, 100),
+                 Screens.fittedBounds(rect(0, -200, 2000, 100), area, false));
+    assertEquals(rect(-1000, -200, 1000, 100),
+                 Screens.fittedBounds(rect(0, -200, 2000, 100), area, true));
+    Rectangle in = rect(0, 0, 10, 10);
+    Screens.fittedBounds(in, area, true);
+    assertEquals(rect(0, 0, 10, 10), in, "argument not modified");
+  }
+
+  //////////////////////////////////////////////////////////////////////
+  //
   // Screen changes
   //
 
@@ -588,12 +822,41 @@ public class ScreensTest {
     assertEquals(1, Screens.getIndex(99, 99));
   }
 
+  @Test
+  public void testGetGeneration() {
+    int gen = Screens.getGeneration();
+    assertEquals(gen, Screens.getGeneration(), "no change");
+    Screens.getScreenSort();
+    assertEquals(gen, Screens.getGeneration(), "no change");
+    fs.dev(R).setBounds(new Rectangle(-2560, 0, 2560, 1440));
+    int gen2 = Screens.getGeneration();
+    assertNotEquals(gen, gen2, "moved");
+    fs.setScreens(P, R_BOUNDS, B_BOUNDS, P_BOUNDS);
+    assertNotEquals(gen2, Screens.getGeneration(), "new devices");
+  }
+
+  /** The pattern in the class comment. */
+  @Test
+  public void testGetGeneration_SeveralCalls() {
+    int gen = Screens.getGeneration();
+    List<List<GraphicsConfiguration>> layout = Screens.getScreenLayout();
+    GraphicsConfiguration gc = Screens.getScreen(Screens.getIndex(1, 0));
+    assertEquals(gen, Screens.getGeneration());
+    assertSame(layout.get(1).get(0), gc);
+
+    gen = Screens.getGeneration();
+    layout = Screens.getScreenLayout();
+    fs.setScreens(1, R_BOUNDS, P_BOUNDS); // B unplugged between calls
+    gc = Screens.getScreen(Screens.getIndex(1, 0));
+    assertNotEquals(gen, Screens.getGeneration(), "caller should start over");
+  }
+
   /** The preferred device is re-evaluated when its screen goes away. */
   @Test
   public void testScreenChange_PreferredScreenRemoved() {
     assertSame(gc(B), Screens.setPrefScreen(2));
     fs.setScreens(1, R_BOUNDS, P_BOUNDS); // B unplugged
-    assertSame(fs.dev(1), Screens.getPrefGraphicsDev(), "default");
+    assertSame(fs.gc(1), Screens.getPrefScreen(), "default");
     assertSame(fs.gc(1), Screens.getPrefScreen());
   }
 
@@ -603,7 +866,7 @@ public class ScreensTest {
     FakeScreens.FakeDevice r = fs.dev(R);
     assertSame(r.getDefaultConfiguration(), Screens.setPrefScreen(1));
     r.setBounds(new Rectangle(-2560, 0, 2560, 1440));
-    assertSame(r, Screens.getPrefGraphicsDev());
+    assertSame(r.getDefaultConfiguration(), Screens.getPrefScreen());
     assertSame(r, Screens.getScreen(0).getDevice());
   }
 
@@ -628,7 +891,7 @@ public class ScreensTest {
     assertEquals(2, idx);
     fs.setScreens(1, R_BOUNDS, P_BOUNDS); // B unplugged
     assertSame(gc(1), Screens.getScreen(idx), "default screen");
-    assertEquals(P_BOUNDS, Screens.getScreenBounds(idx));
+    assertEquals(P_BOUNDS, Screens.getScreen(idx).getBounds());
     assertNull(Screens.setPrefScreen(idx));
   }
 
@@ -640,7 +903,7 @@ public class ScreensTest {
     assertSame(gc(P), Screens.getScreen(idx));
     assertNull(Screens.setPrefScreen(prop("idx")));
     System.setProperty(PREF_SCREEN, "99");
-    assertSame(fs.dev(P), Screens.getPrefGraphicsDev());
+    assertSame(fs.gc(P), Screens.getPrefScreen());
   }
 
   @Test
@@ -677,16 +940,16 @@ public class ScreensTest {
     assertNull(Screens.setPrefScreen(prop("never.set")));
 
     Point p = new Point(10, 20);
-    assertEquals(p, Screens.translateToPrefScreen(p));
-    assertSame(p, Screens.translateToScreen(p, new Point(3000, 0)));
+    assertSame(p, Screens.translateToScreen(p, new FakeScreens.FakeDevice("x",
+        new Rectangle(5000, 0, 100, 100)).getDefaultConfiguration()));
     assertEquals(new Point(10, 20), p);
 
     assertThrows(HeadlessException.class, () -> Screens.getScreen(0));
-    assertThrows(HeadlessException.class, () -> Screens.getScreenBounds(0));
     assertThrows(HeadlessException.class, () -> Screens.getPrefScreen());
-    assertThrows(HeadlessException.class, () -> Screens.getPrefScreenBounds());
-    assertThrows(HeadlessException.class, () -> Screens.getPrefGraphicsDev());
-    assertThrows(HeadlessException.class, () -> Screens.getGraphicsConfiguration(p));
+    assertThrows(HeadlessException.class, () -> Screens.getScreen(window()));
+    assertThrows(HeadlessException.class, () -> Screens.getScreen(p));
+    assertThrows(HeadlessException.class,
+                 () -> Screens.getScreen(new Rectangle(0, 0, 10, 10)));
   }
 
   @Test
@@ -739,9 +1002,9 @@ public class ScreensTest {
     @Test
     public void testTranslateAndCenter() {
       Point loc = new Point(100, 100);
-      assertEquals(loc, Screens.translateToPrefScreen(new Point(loc)));
+      assertEquals(loc, Screens.translateToScreen(new Point(loc), Screens.getPrefScreen()));
       Window w = window();
-      Screens.centerOnPrefScreen(w);
+      Screens.centerOnScreen(w, Screens.getPrefScreen());
       assertEquals(centered(P_BOUNDS, 800, 600), w.getLocation());
     }
   }
