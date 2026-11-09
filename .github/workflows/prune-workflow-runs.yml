@@ -1,0 +1,88 @@
+name: Prune Old Workflow Runs
+
+# Keeps the Actions history short for every workflow in the repository,
+# including dynamic ones (Dependabot, pages-build-deployment, CodeQL) and
+# runs left behind by workflows that have since been deleted.
+#
+# A completed run is deleted only when BOTH are true:
+#   - it is older than KEEP_DAYS, and
+#   - its workflow has at least KEEP_MINIMUM newer completed runs.
+# So each workflow always keeps its most recent runs even if it rarely runs.
+# Runs that are queued or in progress are never touched.
+
+on:
+  schedule:
+    - cron: '17 4 * * 0'   # weekly, Sunday 04:17 UTC
+  # Any PR that edits this file gets a dry run, so changes can be checked
+  # before they are merged. Pull request runs never delete anything.
+  pull_request:
+    paths:
+      - '.github/workflows/prune-workflow-runs.yml'
+  workflow_dispatch:
+    inputs:
+      keep_days:
+        description: 'Delete runs older than this many days'
+        default: '30'
+      keep_minimum:
+        description: 'Always keep at least this many recent runs per workflow'
+        default: '10'
+      dry_run:
+        description: 'List what would be deleted without deleting'
+        type: boolean
+        default: false
+
+permissions:
+  actions: write
+
+concurrency:
+  group: prune-workflow-runs
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      KEEP_DAYS: ${{ inputs.keep_days || '30' }}
+      KEEP_MINIMUM: ${{ inputs.keep_minimum || '10' }}
+      DRY_RUN: ${{ (github.event_name == 'pull_request' || inputs.dry_run) && 'true' || 'false' }}
+    steps:
+      - name: Delete old runs
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "-${KEEP_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)
+          echo "Repo: $REPO  cutoff: $cutoff  keep_minimum: $KEEP_MINIMUM  dry_run: $DRY_RUN"
+
+          # All completed runs, newest first: workflow_id, run_id, created_at, name
+          gh api --paginate "repos/$REPO/actions/runs?status=completed&per_page=100" \
+            --jq '.workflow_runs[] | [.workflow_id, .id, .created_at, .name] | @tsv' \
+            | sort -t $'\t' -k1,1n -k3,3r > runs.tsv
+
+          awk -F'\t' -v keep="$KEEP_MINIMUM" -v cutoff="$cutoff" '
+            { n[$1]++ }
+            n[$1] > keep && $3 < cutoff { print $2 "\t" $3 "\t" $4 }
+          ' runs.tsv > delete.tsv
+
+          total=$(wc -l < runs.tsv)
+          count=$(wc -l < delete.tsv)
+          echo "Completed runs found: $total, to delete: $count"
+
+          failed=0
+          while IFS=$'\t' read -r id created name; do
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "would delete $id  $created  $name"
+            elif gh api -X DELETE "repos/$REPO/actions/runs/$id" --silent; then
+              echo "deleted $id  $created  $name"
+            else
+              echo "::warning::failed to delete run $id ($name)"
+              failed=$((failed + 1))
+            fi
+          done < delete.tsv
+
+          {
+            echo "### Prune workflow runs"
+            echo "- Cutoff: $cutoff (keep_days $KEEP_DAYS), keep_minimum $KEEP_MINIMUM, dry_run $DRY_RUN"
+            echo "- Completed runs scanned: $total"
+            echo "- Selected for deletion: $count (failed: $failed)"
+          } >> "$GITHUB_STEP_SUMMARY"

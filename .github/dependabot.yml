@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # 📦 1. Keep Maven dependencies up-to-date
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+    groups:
+      prod-dependencies:
+        dependency-type: "production"   # Core application dependencies
+      dev-dependencies:
+        dependency-type: "development"  # Test-scoped or build dependencies
+
+  # 🤖 2. Keep GitHub Actions up-to-date (like checkout, setup-java, etc.)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:            # one PR for all action bumps
+        patterns:
+          - "*"

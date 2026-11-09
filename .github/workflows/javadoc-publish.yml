@@ -1,0 +1,55 @@
+name: Deploy Javadoc to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # enable manual trigger
+
+# Grants direct cloud delivery access without requiring a git branch
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let an in-progress deploy finish rather than
+# cancelling it partway through
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Generate Javadoc
+        run: mvn javadoc:javadoc -B
+
+      # Modern GitHub configuration to bypass Jekyll processing
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      # Compresses the javadoc output directory into a cloud artifact
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: 'target/reports/apidocs'
+          retention-days: 1
+
+      # Feeds the artifact straight to the github.io hosting server
+      - name: Deploy to GitHub Pages 🚀
+        id: deployment
+        uses: actions/deploy-pages@v5
